@@ -25,15 +25,15 @@
   <div class="cr-tabla">
     <table class="cr-panel">
       <colgroup>
-        <col style="width:22%"><col style="width:9%"><col style="width:10%"><col style="width:15%">
-        <col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:9%"><col style="width:10%">
+        <col style="width:19%"><col style="width:8%"><col style="width:10%"><col style="width:13%">
+        <col style="width:8%"><col style="width:8%"><col style="width:7%"><col style="width:10%"><col style="width:8%"><col style="width:9%">
       </colgroup>
       <thead><tr>
         <th data-orden="usuario">Perfil</th><th data-orden="pais">País</th><th>Marca</th><th data-orden="nicho_txt">Nicho</th>
         <th data-orden="seguidores" class="cr-num">Seguidores</th><th data-orden="er" class="cr-num">Engagement</th>
-        <th data-orden="score" class="cr-num">Score</th><th data-orden="estado">Estado</th><th data-orden="en_analisis_desde">En análisis desde</th>
+        <th data-orden="score" class="cr-num">Score</th><th data-orden="valor_orden" class="cr-num" title="Precio vs. alcance">Precio / valor</th><th data-orden="estado">Estado</th><th data-orden="en_analisis_desde">En análisis desde</th>
       </tr></thead>
-      <tbody id="cr-filas"><tr><td colspan="9" class="cr-vacio">Cargando…</td></tr></tbody>
+      <tbody id="cr-filas"><tr><td colspan="10" class="cr-vacio">Cargando…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -63,6 +63,14 @@ function filtrados() {
     (!estado || p.estado === estado) && (!nivel || p.nivel === nivel));
 }
 
+const COLOR_VALOR = { "Buen valor": "var(--verde)", "Valor medio": "var(--azul)", "Caro": "var(--rojo)" };
+function valorCelda(v) {
+  if (!v) return '<span class="cr-mini">—</span>';
+  if (v.canje && !v.usd) return '<span class="cr-mini">Canje</span>';
+  const det = v.cpe !== undefined ? `USD ${CR.num(v.cpe, 2)}/interacción` : v.cpm_vistas !== undefined ? `USD ${CR.num(v.cpm_vistas, 1)}/mil vistas` : "";
+  return `USD ${CR.num(v.usd)}${v.calificacion ? `<div class="cr-mini" style="color:${COLOR_VALOR[v.calificacion]};font-weight:600">${CR.esc(v.calificacion)}</div>` : ""}${det ? `<div class="cr-mini">${det}</div>` : ""}`;
+}
+
 function pintar() {
   const lista = filtrados().sort((a, b) => {
     // Los descartados siempre van al final, aunque tengan buen score.
@@ -76,10 +84,10 @@ function pintar() {
   });
   const tb = document.getElementById("cr-filas");
   if (!PERFILES.length) {
-    tb.innerHTML = `<tr><td colspan="9" class="cr-vacio"><b>Todavía no hay perfiles</b>Registra el primero con el botón “Registrar perfil”.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="10" class="cr-vacio"><b>Todavía no hay perfiles</b>Registra el primero con el botón “Registrar perfil”.</td></tr>`;
     return;
   }
-  if (!lista.length) { tb.innerHTML = `<tr><td colspan="9" class="cr-vacio">Ningún perfil coincide con los filtros.</td></tr>`; return; }
+  if (!lista.length) { tb.innerHTML = `<tr><td colspan="10" class="cr-vacio">Ningún perfil coincide con los filtros.</td></tr>`; return; }
   tb.innerHTML = lista.map((p) => `
     <tr onclick="location.href='/creators/p/${p.id}'"${p.estado === "Descartado" ? ' style="opacity:.55"' : ""}>
       <td><div class="cr-persona">${CR.avatar(p.foto, p.usuario || p.nombre)}<div><b>${p.usuario ? "@" + CR.esc(p.usuario) : CR.esc(p.nombre)}</b>
@@ -90,6 +98,7 @@ function pintar() {
       <td class="cr-num">${CR.corto(p.seguidores)}<div class="cr-mini">${CR.esc(p.nivel_cuenta || "")}</div></td>
       <td class="cr-num">${CR.pct(p.er)}</td>
       <td class="cr-num">${CR.score(p.score)}${p.score === null && p.nivel && p.nivel !== "Sin datos" ? `<div class="cr-mini">${CR.esc(p.nivel)}</div>` : ""}${p.alertas_altas ? `<div class="cr-mini" style="color:var(--rojo)">${p.alertas_altas} alerta${p.alertas_altas > 1 ? "s" : ""}</div>` : ""}</td>
+      <td class="cr-num">${valorCelda(p.valor)}</td>
       <td>${CR.esc(p.estado)}${p.campana_activa ? `<div class="cr-mini">En: ${CR.esc(p.campana_activa)}</div>` : ""}</td>
       <td class="cr-mini">${CR.fecha(p.en_analisis_desde)}</td>
     </tr>`).join("");
@@ -111,9 +120,13 @@ function estadisticas() {
 async function cargar() {
   try {
     PERFILES = (await CR.api("/api/creators/perfiles")).perfiles;
-    PERFILES.forEach((p) => { p.nicho_txt = p.nicho || (p.nichos || []).join(", "); });
+    const RANGO = { "Buen valor": 1, "Valor medio": 2, "Caro": 3 };
+    PERFILES.forEach((p) => {
+      p.nicho_txt = p.nicho || (p.nichos || []).join(", ");
+      p.valor_orden = p.valor && p.valor.calificacion ? RANGO[p.valor.calificacion] * 1e6 + (p.valor.cpe ?? p.valor.cpm_vistas ?? 0) : null;
+    });
   } catch (e) {
-    document.getElementById("cr-filas").innerHTML = `<tr><td colspan="9" class="cr-vacio">${CR.esc(e.message)}</td></tr>`;
+    document.getElementById("cr-filas").innerHTML = `<tr><td colspan="10" class="cr-vacio">${CR.esc(e.message)}</td></tr>`;
     return;
   }
   const paises = [...new Set(PERFILES.map((p) => p.pais).filter(Boolean))].sort();

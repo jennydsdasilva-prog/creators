@@ -12,6 +12,9 @@
 <div class="card"><h2>Métricas</h2><div class="cr-kpis" id="f-kpis"></div>
   <div class="cr-mini" id="f-kpis-nota" style="margin-top:10px"></div></div>
 
+<div class="card" id="f-valor-card" style="display:none"><h2>Precio vs. alcance</h2><div class="cr-kpis" id="f-valor"></div>
+  <div class="cr-mini" id="f-valor-nota" style="margin-top:10px"></div></div>
+
 <div class="cr-cols">
   <div class="card"><h2>Alertas</h2><div id="f-alertas"></div></div>
   <div class="card"><h2>Análisis con Claude</h2><div id="f-ia"></div>
@@ -57,6 +60,32 @@ let P = null;
 
 function kpi(valor, etiqueta, ref) {
   return `<div class="cr-kpi"><div class="v">${valor}</div><div class="l">${etiqueta}</div>${ref ? `<div class="r">${ref}</div>` : ""}</div>`;
+}
+
+const CLASE_VALOR = { "Buen valor": "var(--verde)", "Valor medio": "var(--azul)", "Caro": "var(--rojo)" };
+function usd(x, dec) { return x === null || x === undefined ? "—" : "USD " + CR.num(x, dec ?? (x < 10 ? 2 : 0)); }
+function pintarValor(v, ref, m) {
+  const card = document.getElementById("f-valor-card");
+  if (!v) { card.style.display = "none"; return; }
+  card.style.display = "";
+  if (v.canje && !v.usd) {
+    document.getElementById("f-valor").innerHTML = kpi("Canje", "Tarifa", "Trabaja por producto, sin costo en dinero");
+    document.getElementById("f-valor-nota").textContent = "";
+    return;
+  }
+  const original = v.moneda === "COP" ? `COP ${CR.num(v.monto)} (pesos colombianos)` : "";
+  document.getElementById("f-valor").innerHTML = [
+    kpi(usd(v.usd), "Precio en dólares", original),
+    kpi(v.calificacion ? `<span style="color:${CLASE_VALOR[v.calificacion]}">${CR.esc(v.calificacion)}</span>` : "—", "Valor", v.base ? "Medido " + CR.esc(v.base) : "Faltan métricas para comparar"),
+    kpi(usd(v.cpe, 2), "Costo por interacción", ref.cpe ? `Bueno ≤ USD ${CR.num(ref.cpe[0], 2)} · caro > ${CR.num(ref.cpe[1], 2)}` : ""),
+    kpi(usd(v.cpm_vistas), "Costo por mil vistas", m.vistas_prom ? `Sobre ${CR.corto(m.vistas_prom)} vistas por reel` : "Sin datos de vistas"),
+    kpi(usd(v.cpm_seguidores), "Costo por mil seguidores", m.seguidores ? `${CR.corto(m.seguidores)} seguidores` : ""),
+  ].join("");
+  const notas = [];
+  if (v.moneda === "COP" && ref.tasa_cop) notas.push(`Convertido a 1 USD = ${CR.num(ref.tasa_cop)} COP.`);
+  notas.push("Se compara el precio con el alcance de una publicación promedio; si la tarifa es un paquete (ej. reel + historias), el costo real por alcance es menor.");
+  if ((m.pct_likes_ocultos || 0) >= 50) notas.push("Oculta los likes: el costo por interacción no es confiable.");
+  document.getElementById("f-valor-nota").textContent = notas.join(" ");
 }
 
 function pintar(datos) {
@@ -106,6 +135,8 @@ function pintar(datos) {
   ].join("");
   document.getElementById("f-kpis-nota").textContent = P.no_profesional ? "Cuenta sin perfil profesional en Instagram: solo se ven sus datos públicos, sin likes ni comentarios." : m.manual ? "Métricas cargadas a mano por el equipo." : !m.seguidores ? "Todavía sin métricas." :
     `Calculado sobre ${m.posts_analizados || 0} posts (se excluyen los de menos de 48 h).${m.likes_ocultos ? " La cuenta oculta los likes en algunos posts." : ""}`;
+
+  pintarValor(datos.valor, datos.referencias_valor || {}, m);
 
   const al = P.alertas || [];
   document.getElementById("f-alertas").innerHTML = al.length ? al.map((a) =>

@@ -717,7 +717,7 @@ def contexto_perfil(perfil, m, alertas_lista):
         f"Perfil: {'@' + perfil['usuario'] if perfil.get('usuario') else 'sin usuario registrado'} "
         f"({datos.get('nombre') or perfil.get('nombre_contacto') or 'sin nombre'}) · plataforma: {perfil.get('plataforma') or 'instagram'}\n"
         f"En análisis desde: {perfil.get('en_analisis_desde') or 'sin dato'} · Origen: {perfil.get('origen') or 'sin dato'} · "
-        f"Tarifa/costo: {perfil.get('tarifa') or 'sin dato'}\n"
+        f"Tarifa/costo: {perfil.get('tarifa') or 'sin dato'} · Valor precio/alcance: {json.dumps(valor_precio(perfil), ensure_ascii=False)}\n"
         f"Audiencia (según sus estadísticas): países {perfil.get('audiencia_paises') or 'sin dato'} · ciudades "
         f"{perfil.get('audiencia_ciudades') or 'sin dato'} · mujeres {perfil.get('audiencia_mujeres') or 'sin dato'}% · "
         f"edades {perfil.get('audiencia_edades') or 'sin dato'} · fuente {perfil.get('audiencia_fuente') or 'sin dato'}\n"
@@ -933,6 +933,71 @@ def alertas_extra(perfil):
     return a
 
 
+# ─── Valor: precio vs. alcance ────────────────────────────────────────────────
+
+# Pesos colombianos por dólar (TRM). Se puede cambiar en Render con CREATORS_TASA_COP.
+TASA_COP = float(os.environ.get("CREATORS_TASA_COP", "3270"))
+
+# Referencias aproximadas para calificar el valor (USD). Ajustables con la experiencia.
+VALOR_CPE = (0.10, 0.30)        # costo por interacción: bueno ≤ 0.10, medio ≤ 0.30
+VALOR_CPM_VISTAS = (10, 25)     # costo por mil vistas
+VALOR_CPM_SEG = (10, 25)        # costo por mil seguidores (solo si no hay más datos)
+
+
+def leer_precio(tarifa):
+    """'COP 1.800.000 + IVA', 'USD 350 por reel', '$120', 'Canje' → {monto, moneda, usd} o None.
+    Si hay varios precios, toma el primero (normalmente el del reel o el paquete)."""
+    t = (tarifa or "").strip()
+    if not t:
+        return None
+    baja = t.lower()
+    m = re.search(r"(\d[\d.,]*)\s*(k|mil)?", baja)
+    if not m:
+        return {"canje": True} if "canje" in baja else None
+    numero, sufijo = m.group(1), m.group(2)
+    if re.fullmatch(r"\d{1,3}([.,]\d{3})+", numero):        # 1.800.000 / 1,800,000
+        monto = float(re.sub(r"[.,]", "", numero))
+    else:
+        monto = float(numero.replace(",", "."))
+    if sufijo:
+        monto *= 1000
+    es_cop = "cop" in baja or "peso" in baja or monto >= 20000   # nadie cobra USD 20.000 por un post
+    moneda = "COP" if es_cop else "USD"
+    usd = monto / TASA_COP if es_cop else monto
+    return {"monto": monto, "moneda": moneda, "usd": round(usd, 2), "canje": "canje" in baja}
+
+
+def _calificar(valor, rango):
+    return "Buen valor" if valor <= rango[0] else "Valor medio" if valor <= rango[1] else "Caro"
+
+
+def valor_precio(p):
+    """Compara lo que cobra con el alcance que tiene."""
+    precio = leer_precio(p.get("tarifa"))
+    if not precio:
+        return None
+    if precio.get("canje") and not precio.get("usd"):
+        return {"canje": True, "texto": "Canje"}
+    m = p.get("metricas") or {}
+    usd = precio["usd"]
+    v = {"monto": precio["monto"], "moneda": precio["moneda"], "usd": usd, "canje": precio.get("canje", False)}
+    seg, inter, vistas = m.get("seguidores"), m.get("interacciones_prom"), m.get("vistas_prom")
+    verificable = (m.get("pct_likes_ocultos") or 0) < OCULTOS_SIN_SCORE
+    if seg:
+        v["cpm_seguidores"] = round(usd / seg * 1000, 2)
+    if inter and verificable:
+        v["cpe"] = round(usd / inter, 3)
+    if vistas:
+        v["cpm_vistas"] = round(usd / vistas * 1000, 2)
+    if "cpe" in v:
+        v["calificacion"], v["base"] = _calificar(v["cpe"], VALOR_CPE), "por interacción"
+    elif "cpm_vistas" in v:
+        v["calificacion"], v["base"] = _calificar(v["cpm_vistas"], VALOR_CPM_VISTAS), "por mil vistas"
+    elif "cpm_seguidores" in v:
+        v["calificacion"], v["base"] = _calificar(v["cpm_seguidores"], VALOR_CPM_SEG), "por mil seguidores"
+    return v
+
+
 CAMPOS_MANUALES = ("seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post")
 
 
@@ -991,6 +1056,7 @@ def resumen_perfil(p):
         "recomendacion": (p.get("ia") or {}).get("recomendacion"),
         "marca_sugerida": _marca_corta((p.get("ia") or {}).get("mejor_marca")),
         "no_profesional": bool(p.get("no_profesional")),
+        "valor": valor_precio(p),
         "audiencia": (p.get("audiencia_ciudades") or p.get("audiencia_paises") or "")[:60],
         "nichos": (p.get("ia") or {}).get("nichos") or [],
         "alertas_altas": sum(1 for a in p.get("alertas") or [] if a.get("gravedad") == "alta"),
@@ -1319,7 +1385,8 @@ def api_perfil(pid):
             campanas_de.append({"id": c["id"], "nombre": c.get("nombre"), "marca": c.get("marca"),
                                 "estado": c.get("estado"), "inicio": c.get("inicio"),
                                 "costo": part.get("costo"), "posts": len(part.get("posts") or [])})
-    return jsonify({"perfil": p, "campanas": campanas_de})
+    return jsonify({"perfil": p, "campanas": campanas_de, "valor": valor_precio(p),
+                    "referencias_valor": {"cpe": VALOR_CPE, "cpm_vistas": VALOR_CPM_VISTAS, "tasa_cop": TASA_COP}})
 
 
 @creators_bp.route("/api/creators/perfiles/<pid>", methods=["PATCH"])
@@ -1456,7 +1523,7 @@ def api_exportar():
     w = csv.writer(salida)
     w.writerow(["Usuario", "Enlace", "Nombre", "País", "Ciudad", "Marcas", "Nicho", "Estado", "Seguidores",
                 "Nivel cuenta", "Engagement %", "Score", "Nivel", "Recomendación IA", "Email", "Teléfono",
-                "Tarifa", "TikTok", "Etiquetas", "En análisis desde", "Origen", "Audiencia países", "Audiencia ciudades", "Analizado"])
+                "Tarifa", "TikTok", "Etiquetas", "En análisis desde", "Origen", "Audiencia países", "Audiencia ciudades", "Precio USD", "Costo por interacción USD", "Costo por mil vistas USD", "Valor", "Analizado"])
     for p in _leer()["perfiles"].values():
         r, m = resumen_perfil(p), p.get("metricas") or {}
         w.writerow([f"@{p['usuario']}" if p.get("usuario") else "", f"https://instagram.com/{p['usuario']}" if p.get("usuario") else "", r["nombre"], p.get("pais", ""),
@@ -1466,7 +1533,10 @@ def api_exportar():
                     r["nivel"] or "", r["recomendacion"] or "", p.get("email", ""), p.get("telefono", ""),
                     p.get("tarifa", ""), p.get("tiktok", ""), ", ".join(r["etiquetas"]),
                     r["en_analisis_desde"], p.get("origen", ""), p.get("audiencia_paises", ""),
-                    p.get("audiencia_ciudades", ""), (r["actualizado"] or "")[:10]])
+                    p.get("audiencia_ciudades", ""),
+                    *[str((r["valor"] or {}).get(k, "")).replace(".", ",") for k in ("usd", "cpe", "cpm_vistas")],
+                    (r["valor"] or {}).get("calificacion") or (r["valor"] or {}).get("texto", ""),
+                    (r["actualizado"] or "")[:10]])
     # BOM para que Excel abra bien los acentos.
     return Response("\ufeff" + salida.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=creators-piazza-{_hoy()}.csv"})
