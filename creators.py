@@ -568,6 +568,9 @@ def calcular_score(m, ia=None, afinidad_equipo=None):
     con_valor = {k: v for k, v in partes.items() if v is not None}
     if not con_valor:
         return {**partes, "total": None, "nivel": "Sin datos"}
+    if partes["engagement"] is None:
+        # Sin engagement no hay score: la afinidad sola daría una nota engañosa.
+        return {**partes, "total": None, "nivel": "Falta engagement"}
     peso = sum(PESOS[k] for k in con_valor)
     total = round(sum(v * PESOS[k] for k, v in con_valor.items()) / peso)
     # Una alerta grave (likes comprados, crecimiento sospechoso…) pesa aunque el
