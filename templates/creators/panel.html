@@ -22,7 +22,11 @@
   </div>
   <div class="cr-mini" style="margin-bottom:8px"><span class="cr-chip">OP</span> marca elegida por el equipo · <span class="cr-chip cr-sugerida">★ Lotto</span> marca sugerida por Claude</div>
   <div class="cr-tabla">
-    <table>
+    <table class="cr-panel">
+      <colgroup>
+        <col style="width:22%"><col style="width:9%"><col style="width:10%"><col style="width:15%">
+        <col style="width:9%"><col style="width:9%"><col style="width:7%"><col style="width:9%"><col style="width:10%">
+      </colgroup>
       <thead><tr>
         <th data-orden="usuario">Perfil</th><th data-orden="pais">País</th><th>Marca</th><th data-orden="nicho_txt">Nicho</th>
         <th data-orden="seguidores" class="cr-num">Seguidores</th><th data-orden="er" class="cr-num">Engagement</th>
@@ -78,7 +82,7 @@ function pintar() {
         <span>${p.usuario ? CR.esc(p.nombre) : "<i>sin usuario</i>"}${p.plataforma === "tiktok" ? " · TikTok" : ""}${p.no_profesional ? ' · <span title="Instagram no comparte sus estadísticas">no profesional</span>' : ""}</span></div></div></td>
       <td>${CR.esc(p.pais) || "—"}</td>
       <td>${marcas(p)}</td>
-      <td class="cr-mini" style="max-width:170px">${CR.esc(p.nicho_txt) || "—"}</td>
+      <td class="cr-mini">${CR.esc(p.nicho_txt) || "—"}</td>
       <td class="cr-num">${CR.corto(p.seguidores)}<div class="cr-mini">${CR.esc(p.nivel_cuenta || "")}</div></td>
       <td class="cr-num">${CR.pct(p.er)}</td>
       <td class="cr-num">${CR.score(p.score)}${p.alertas_altas ? `<div class="cr-mini" style="color:var(--rojo)">${p.alertas_altas} alerta${p.alertas_altas > 1 ? "s" : ""}</div>` : ""}</td>

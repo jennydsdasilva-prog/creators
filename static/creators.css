@@ -97,3 +97,8 @@ details.cr-det summary { cursor: pointer; font-weight: 600; font-size: 14px; col
   .contenido { max-width: none; padding: 0; }
 }
 .cr-sugerida { background: #eef1f8; color: #4b5a85; border: 1px dashed #7485ad; }
+/* Panel de perfiles: anchos fijos por columna para que ninguna se coma el espacio. */
+.cr-panel { table-layout: fixed; min-width: 980px; }
+.cr-panel td, .cr-panel th { overflow-wrap: anywhere; }
+.cr-panel .cr-persona { min-width: 0; }
+.cr-panel .cr-avatar { width: 34px; height: 34px; }
