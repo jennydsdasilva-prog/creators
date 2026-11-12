@@ -93,8 +93,10 @@ NIVELES_CUENTA = [
     ("Mega", 1_000_000, float("inf"), (0.4, 1.5)),
 ]
 
-# Likes ocultos: desde este % de publicaciones no hay score; por debajo, el score tiene tope.
+# Likes ocultos: desde OCULTOS_SIN_SCORE % de publicaciones no hay score; desde
+# OCULTOS_CON_TOPE % el score tiene tope. Menos que eso (1 o 2 posts) no cambia la lectura.
 OCULTOS_SIN_SCORE = 50
+OCULTOS_CON_TOPE = 20
 TOPE_OCULTOS = 70
 
 PESOS = {"engagement": 30, "autenticidad": 25, "afinidad": 25, "actividad": 20}
@@ -475,9 +477,11 @@ def alertas(m):
     if pct >= OCULTOS_SIN_SCORE:
         a.append((f"Oculta los likes en el {pct}% de sus publicaciones: su engagement no se puede verificar, por eso no tiene score. "
                   "Pide capturas de sus estadísticas antes de decidir.", "media"))
-    elif pct > 0:
+    elif pct >= OCULTOS_CON_TOPE:
         a.append((f"Oculta los likes en el {pct}% de sus publicaciones: el engagement se calculó con las que sí los muestran "
                   f"y el score queda limitado a {TOPE_OCULTOS} hasta verificar sus estadísticas.", "info"))
+    elif pct > 0:
+        a.append((f"Oculta los likes en algunas publicaciones ({pct}%): el engagement se calculó con las demás.", "info"))
     if er is not None:
         if er < bajo * 0.4:
             a.append((f"Engagement muy bajo para su tamaño ({er}% vs. {bajo}–{alto}% esperado). Posible audiencia inactiva o seguidores comprados.", "alta"))
@@ -596,7 +600,7 @@ def calcular_score(m, ia=None, afinidad_equipo=None):
     # Una alerta grave (likes comprados, crecimiento sospechoso…) pesa aunque el
     # resto de las métricas se vea bien.
     total = max(0, total - min(18, 6 * sum(1 for a in alertas(m) if a["gravedad"] == "alta")))
-    if pct > 0:
+    if pct >= OCULTOS_CON_TOPE:
         total = min(total, TOPE_OCULTOS)  # no puede salir "Recomendado" sin verificar sus likes
     nivel = "Recomendado" if total >= 75 else "Potencial" if total >= 60 else "Revisar" if total >= 45 else "No recomendado"
     return {**partes, "total": total, "nivel": nivel}
