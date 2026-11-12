@@ -65,6 +65,9 @@ function filtrados() {
 
 function pintar() {
   const lista = filtrados().sort((a, b) => {
+    // Los descartados siempre van al final, aunque tengan buen score.
+    const da = a.estado === "Descartado", db = b.estado === "Descartado";
+    if (da !== db) return da ? 1 : -1;
     const x = a[ORDEN.campo], y = b[ORDEN.campo];
     if (x === y) return 0;
     if (x === null || x === undefined || x === "") return 1;
@@ -78,7 +81,7 @@ function pintar() {
   }
   if (!lista.length) { tb.innerHTML = `<tr><td colspan="9" class="cr-vacio">Ningún perfil coincide con los filtros.</td></tr>`; return; }
   tb.innerHTML = lista.map((p) => `
-    <tr onclick="location.href='/creators/p/${p.id}'">
+    <tr onclick="location.href='/creators/p/${p.id}'"${p.estado === "Descartado" ? ' style="opacity:.55"' : ""}>
       <td><div class="cr-persona">${CR.avatar(p.foto, p.usuario || p.nombre)}<div><b>${p.usuario ? "@" + CR.esc(p.usuario) : CR.esc(p.nombre)}</b>
         <span>${p.usuario ? CR.esc(p.nombre) : "<i>sin usuario</i>"}${p.plataforma === "tiktok" ? " · TikTok" : ""}${p.no_profesional ? ' · <span title="Instagram no comparte sus estadísticas">no profesional</span>' : ""}</span></div></div></td>
       <td>${CR.esc(p.pais) || "—"}${p.audiencia ? `<div class="cr-mini" title="Audiencia según sus estadísticas">👥 ${CR.esc(p.audiencia)}</div>` : ""}</td>
@@ -94,7 +97,7 @@ function pintar() {
 
 function estadisticas() {
   const n = PERFILES.length;
-  const rec = PERFILES.filter((p) => p.nivel === "Recomendado").length;
+  const rec = PERFILES.filter((p) => p.nivel === "Recomendado" && p.estado !== "Descartado").length;
   const act = PERFILES.filter((p) => p.estado === "Activo").length;
   const ers = PERFILES.map((p) => p.er).filter((x) => x !== null && x !== undefined);
   const prom = ers.length ? ers.reduce((a, b) => a + b, 0) / ers.length : null;
