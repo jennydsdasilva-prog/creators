@@ -813,12 +813,14 @@ def analizar(perfil, con_ia=True):
                 errores.append(str(e))
 
     if usar_manual:
-        perfil["fuente"] = "navegador" if perfil.get("posts") and not _numero((perfil.get("manual") or {}).get("seguidores")) else "manual"
+        perfil["fuente"] = ("navegador" if (perfil.get("posts") or (perfil.get("datos") or {}).get("seguidores"))
+                            and not _numero((perfil.get("manual") or {}).get("seguidores")) else "manual")
         manual = perfil.get("manual") or {}
         datos = perfil.get("datos") or {}
         datos["seguidores"] = int(_numero(manual.get("seguidores")) or 0) or datos.get("seguidores")
         perfil["datos"] = datos
-        if perfil.get("posts") and not _numero(manual.get("seguidores")):
+        leidos = perfil.get("posts") or (perfil.get("datos") or {}).get("seguidores")
+        if leidos and not _numero(manual.get("seguidores")):
             # Datos leídos antes desde el navegador: se recalculan con esos posts.
             m = calcular_metricas(perfil.get("datos") or {}, perfil["posts"], perfil.get("historial"))
         else:
