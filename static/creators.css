@@ -102,3 +102,4 @@ details.cr-det summary { cursor: pointer; font-weight: 600; font-size: 14px; col
 .cr-panel td, .cr-panel th { overflow-wrap: anywhere; }
 .cr-panel .cr-persona { min-width: 0; }
 .cr-panel .cr-avatar { width: 34px; height: 34px; }
+.cr-panel .cr-chip { white-space: normal; max-width: 100%; }

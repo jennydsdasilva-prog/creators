@@ -902,6 +902,15 @@ def _aplicar_campos(perfil, body):
     perfil["actualizado"] = _ahora()
 
 
+def _marca_corta(texto):
+    """'Lotto (línea deportiva de mujer)' → 'Lotto'. Si no reconoce la marca, la corta a 20 caracteres."""
+    texto = (texto or "").strip()
+    for marca in MARCAS:
+        if texto.lower().startswith(marca.lower()):
+            return marca
+    return texto[:20]
+
+
 def resumen_perfil(p):
     m, s, d = p.get("metricas") or {}, p.get("score") or {}, p.get("datos") or {}
     return {
@@ -914,7 +923,7 @@ def resumen_perfil(p):
         "seguidores": m.get("seguidores"), "er": m.get("er"), "nivel_cuenta": m.get("nivel_cuenta"),
         "score": s.get("total"), "nivel": s.get("nivel"),
         "recomendacion": (p.get("ia") or {}).get("recomendacion"),
-        "marca_sugerida": (p.get("ia") or {}).get("mejor_marca") or "",
+        "marca_sugerida": _marca_corta((p.get("ia") or {}).get("mejor_marca")),
         "no_profesional": bool(p.get("no_profesional")),
         "nichos": (p.get("ia") or {}).get("nichos") or [],
         "alertas_altas": sum(1 for a in p.get("alertas") or [] if a.get("gravedad") == "alta"),
