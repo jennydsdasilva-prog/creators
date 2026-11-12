@@ -21,6 +21,14 @@
 
 <div class="card"><h2>Conclusiones</h2><div id="r-conclusiones"></div>
   {% if ia_ok %}<button class="btn btn-verde btn-sm no-imprimir" id="r-generar" style="margin-top:12px">Generar conclusiones con IA</button>{% endif %}
+  <div class="no-imprimir" style="margin-top:14px;border-top:1px solid var(--gris-borde);padding-top:12px">
+    <div class="cr-mini" style="margin-bottom:8px"><b>Con Claude:</b> 1) “Copiar para Claude” · 2) pégalo en un chat con Claude ·
+      3) copia su respuesta completa y pégala aquí.</div>
+    <div class="cr-acciones"><button class="btn btn-gris btn-sm" id="r-copiar">Copiar para Claude</button>
+      <a class="cr-mini" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir Claude ↗</a><span id="r-copiado" class="cr-mini"></span></div>
+    <textarea id="r-pegar" rows="4" placeholder="Pega aquí la respuesta de Claude" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--gris-borde);border-radius:8px;font-size:13px;font-family:inherit"></textarea>
+    <button class="btn btn-verde btn-sm" id="r-guardar" style="margin-top:8px">Guardar conclusiones</button> <span id="r-msg" class="cr-mini"></span>
+  </div>
 </div>
 {% endblock %}
 
@@ -58,8 +66,8 @@ function pintar(d) {
   document.getElementById("r-conclusiones").innerHTML = k ? `<p style="font-size:14px;line-height:1.6">${CR.esc(k.resumen)}</p>
     <div class="cr-cols"><div><div class="cr-etq">Lo que funcionó</div>${lst(k.destacados)}</div><div><div class="cr-etq">A mejorar</div>${lst(k.a_mejorar)}</div></div>
     <div class="cr-etq">Recomendaciones</div>${lst(k.recomendaciones)}
-    <div class="cr-mini" style="margin-top:10px">Generado con IA el ${CR.fecha(k.fecha)} a partir de los números de arriba.</div>` :
-    '<div class="cr-mini">Todavía no hay conclusiones.{% if ia_ok %} Genéralas cuando estén cargadas todas las métricas.{% endif %}</div>';
+    <div class="cr-mini" style="margin-top:10px">Escritas por Claude el ${CR.fecha(k.fecha)} a partir de los números de arriba.</div>` :
+    '<div class="cr-mini">Todavía no hay conclusiones. Genéralas cuando estén cargadas todas las métricas.</div>';
   const btn = document.getElementById("r-generar");
   if (btn) btn.textContent = k ? "Volver a generar conclusiones" : "Generar conclusiones con IA";
 }
@@ -68,6 +76,19 @@ if (btn) btn.addEventListener("click", async () => {
   CR.cargando(true, "Escribiendo las conclusiones…");
   try { pintar(await CR.api(`/api/creators/campanas/${CID}/conclusiones`, { method: "POST" })); }
   catch (e) { alert(e.message); } finally { CR.cargando(false); }
+});
+document.getElementById("r-copiar").addEventListener("click", async () => {
+  const msg = document.getElementById("r-copiado");
+  try { const { texto } = await CR.api(`/api/creators/campanas/${CID}/para-claude`);
+    msg.textContent = (await CR.copiar(texto)) ? "Copiado. Pégalo en Claude." : "No se pudo copiar."; }
+  catch (e) { msg.textContent = e.message; }
+});
+document.getElementById("r-guardar").addEventListener("click", async () => {
+  const msg = document.getElementById("r-msg"), texto = document.getElementById("r-pegar").value;
+  if (!texto.trim()) { msg.textContent = "Pega primero la respuesta de Claude."; return; }
+  try { pintar(await CR.api(`/api/creators/campanas/${CID}/conclusiones-pegadas`, { method: "POST", body: { texto } }));
+    document.getElementById("r-pegar").value = ""; msg.innerHTML = '<span style="color:var(--verde)">Conclusiones guardadas.</span>'; }
+  catch (e) { msg.innerHTML = `<span style="color:var(--rojo)">${CR.esc(e.message)}</span>`; }
 });
 CR.api("/api/creators/campanas/" + CID).then(pintar).catch((e) => {
   document.getElementById("r-tabla").innerHTML = `<div class="cr-vacio"><b>${CR.esc(e.message)}</b></div>`;

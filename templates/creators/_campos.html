@@ -12,6 +12,16 @@
   <div class="campo"><label for="c-ciudad">Ciudad</label><input id="c-ciudad" maxlength="80"></div>
   <div class="campo"><label for="c-estado">Estado</label>
     <select id="c-estado">{% for e in estados %}<option>{{ e }}</option>{% endfor %}</select></div>
+  <div class="campo"><label for="c-afinidad_equipo">Afinidad con la marca (equipo)</label>
+    <select id="c-afinidad_equipo">
+      <option value="">Sin calificar</option>
+      <option value="5">5 · Encaja perfecto</option>
+      <option value="4">4 · Encaja bien</option>
+      <option value="3">3 · Podría funcionar</option>
+      <option value="2">2 · Encaja poco</option>
+      <option value="1">1 · No encaja</option>
+    </select>
+    <div class="hint">Entra al score como afinidad.</div></div>
   <div class="campo"><label for="c-nicho">Nicho</label><input id="c-nicho" maxlength="120" placeholder="Running, fútbol, moda…"></div>
   <div class="campo"><label for="c-etiquetas">Etiquetas</label><input id="c-etiquetas" maxlength="200" placeholder="Separadas por coma">
     <div class="hint">Cortas, de menos de 20 caracteres.</div></div>
@@ -49,7 +59,7 @@
 </details>
 
 <script>
-const CAMPOS_TEXTO = ["pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
+const CAMPOS_TEXTO = ["afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
 const CAMPOS_MANUAL = ["seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post"];
 function leerCampos() {
   const b = {};

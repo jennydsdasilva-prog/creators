@@ -543,7 +543,8 @@ def _score_actividad(m):
     return max(0, min(100, s))
 
 
-def calcular_score(m, ia=None):
+def calcular_score(m, ia=None, afinidad_equipo=None):
+    """afinidad_equipo: nota de 1 a 5 que pone el equipo en la ficha."""
     partes = {
         "engagement": _score_engagement(m),
         "autenticidad": _score_autenticidad(m),
@@ -556,6 +557,11 @@ def calcular_score(m, ia=None):
         if isinstance(ia.get("autenticidad"), (int, float)) and partes["autenticidad"] is not None:
             # Las métricas pesan más que la lectura de la IA: son datos, no opinión.
             partes["autenticidad"] = round(partes["autenticidad"] * 0.6 + ia["autenticidad"] * 0.4)
+    if afinidad_equipo in (1, 2, 3, 4, 5):
+        nota = afinidad_equipo * 20
+        # Si hay también lectura de Claude, se promedian: el equipo conoce las marcas,
+        # Claude leyó el contenido.
+        partes["afinidad"] = nota if partes["afinidad"] is None else round((nota + partes["afinidad"]) / 2)
     con_valor = {k: v for k, v in partes.items() if v is not None}
     if not con_valor:
         return {**partes, "total": None, "nivel": "Sin datos"}
@@ -659,7 +665,8 @@ SISTEMA_PERFIL = (
 )
 
 
-def analizar_con_ia(perfil, m, alertas_lista):
+def contexto_perfil(perfil, m, alertas_lista):
+    """Texto con todo lo que se sabe del perfil, para Claude (API o chat)."""
     marcas = perfil.get("marcas") or list(MARCAS.keys())
     contexto_marcas = "\n".join(f"- {MARCAS.get(x, x)}" for x in marcas)
     posts = perfil.get("posts") or []
@@ -686,10 +693,94 @@ def analizar_con_ia(perfil, m, alertas_lista):
         "Comentarios de muestra que pegó el equipo:\n" + (perfil.get("comentarios_muestra") or "(no hay)") + "\n\n"
         "Notas del equipo:\n" + (perfil.get("notas") or "(no hay)")
     )
+    return contenido
+
+
+def analizar_con_ia(perfil, m, alertas_lista):
+    contenido = contexto_perfil(perfil, m, alertas_lista)
     res = _llamar_claude(SISTEMA_PERFIL, contenido, HERRAMIENTA_PERFIL)
     res["fecha"] = _ahora()
     res["nichos"] = [_texto(x, 20) for x in res.get("nichos") or []][:6]
     return res
+
+
+# ─── Análisis desde el chat de Claude (sin API) ───────────────────────────────
+# La herramienta arma un texto con los datos; el equipo lo pega en Claude, que
+# responde con un bloque JSON; ese bloque se pega de vuelta en la ficha.
+
+def _formato_json(herramienta):
+    props = herramienta["input_schema"]["properties"]
+    lineas = []
+    claves = list(props)
+    for k, v in props.items():
+        tipo = {"integer": "número 0-100", "string": "texto", "array": "lista de textos"}.get(v["type"], v["type"])
+        if "enum" in v:
+            tipo = " | ".join(f'"{x}"' for x in v["enum"])
+        coma = "," if k != claves[-1] else ""
+        nota = f"  // {v['description']}" if v.get("description") else ""
+        lineas.append(f'  "{k}": {tipo}{coma}{nota}')
+    return "{\n" + "\n".join(lineas) + "\n}"
+
+
+def texto_para_chat_perfil(perfil):
+    m = perfil.get("metricas") or {}
+    return (
+        SISTEMA_PERFIL + "\n\n"
+        "Analiza este perfil de influencer. Responde con un breve comentario si quieres y, al final, "
+        "con UN bloque JSON con exactamente estos campos (es lo que se pega de vuelta en la herramienta):\n"
+        + _formato_json(HERRAMIENTA_PERFIL) + "\n\n"
+        "──── Datos del perfil ────\n" + contexto_perfil(perfil, m, perfil.get("alertas") or [])
+    )
+
+
+def texto_para_chat_campana(c, rep):
+    return (
+        SISTEMA_CAMPANA + "\n\n"
+        "Escribe las conclusiones de este reporte de campaña. Responde con un breve comentario si quieres y, "
+        "al final, con UN bloque JSON con exactamente estos campos:\n"
+        + _formato_json(HERRAMIENTA_CAMPANA) + "\n\n──── Datos ────\n" + contexto_campana(c, rep)
+    )
+
+
+def leer_json_pegado(texto, herramienta):
+    """Saca el bloque JSON de lo que respondió Claude y lo valida contra el esquema."""
+    texto = texto or ""
+    bloque = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", texto, re.S)
+    candidato = bloque.group(1) if bloque else None
+    if not candidato:
+        ini, fin = texto.find("{"), texto.rfind("}")
+        candidato = texto[ini:fin + 1] if ini != -1 and fin > ini else ""
+    try:
+        datos = json.loads(candidato)
+    except ValueError:
+        raise ValueError("No encontré el bloque JSON en lo que pegaste. Copia la respuesta completa de Claude, incluido el bloque entre llaves { }.")
+    if not isinstance(datos, dict):
+        raise ValueError("El bloque pegado no tiene el formato esperado.")
+    esquema = herramienta["input_schema"]
+    faltan = [k for k in esquema["required"] if k not in datos]
+    if faltan:
+        raise ValueError("Al análisis le faltan campos: " + ", ".join(faltan) + ".")
+    limpio = {}
+    for k, v in esquema["properties"].items():
+        if k not in datos:
+            continue
+        val = datos[k]
+        if v["type"] == "integer":
+            n = _numero(val)
+            if n is None:
+                raise ValueError(f"El campo {k} tiene que ser un número.")
+            limpio[k] = max(0, min(100, round(n)))
+        elif v["type"] == "array":
+            limpio[k] = [_texto(x, 300) for x in (val if isinstance(val, list) else [val]) if _texto(x)][:8]
+        else:
+            limpio[k] = _texto(val, 1500)
+            if "enum" in v and limpio[k] not in v["enum"]:
+                limpio[k] = next((e for e in v["enum"] if e.lower() == limpio[k].lower()), v["enum"][1])
+    limpio["fecha"] = _ahora()
+    limpio["fuente"] = "chat"
+    if "nichos" in limpio:
+        limpio["nichos"] = [_texto(x, 20) for x in limpio["nichos"]][:6]
+    return limpio
 
 
 # ─── Análisis completo de un perfil ───────────────────────────────────────────
@@ -734,7 +825,7 @@ def analizar(perfil, con_ia=True):
     perfil["metricas"] = m
     perfil["alertas"] = lista_alertas
     perfil["ia"] = ia
-    perfil["score"] = calcular_score(m, ia)
+    perfil["score"] = calcular_score(m, ia, perfil.get("afinidad_equipo"))
     perfil["errores"] = errores
     perfil["analizado"] = _ahora()
 
@@ -764,6 +855,9 @@ def _aplicar_campos(perfil, body):
         perfil["etiquetas"] = [_texto(x, 20) for x in _lista(body.get("etiquetas"))]
     if body.get("estado") in ESTADOS:
         perfil["estado"] = body["estado"]
+    if "afinidad_equipo" in body:
+        n = _numero(body.get("afinidad_equipo"))
+        perfil["afinidad_equipo"] = int(n) if n in (1, 2, 3, 4, 5) else None
     if body.get("modo") in ("auto", "manual"):
         perfil["modo"] = body["modo"]
     if isinstance(body.get("manual"), dict):
@@ -925,14 +1019,18 @@ SISTEMA_CAMPANA = (
 )
 
 
-def conclusiones_campana(c, rep):
-    contenido = (
+def contexto_campana(c, rep):
+    return (
         f"Campaña: {c.get('nombre')} · Marca: {c.get('marca')} · País: {c.get('pais')} · "
         f"{c.get('inicio')} a {c.get('fin')} · Moneda: {c.get('moneda') or 'USD'}\n"
         f"Objetivo: {c.get('objetivo') or 'sin dato'}\nPresupuesto: {c.get('presupuesto')}\n\n"
         f"Totales: {json.dumps(rep['totales'], ensure_ascii=False)}\n\n"
         f"Por influencer: {json.dumps(rep['filas'], ensure_ascii=False)}"
     )
+
+
+def conclusiones_campana(c, rep):
+    contenido = contexto_campana(c, rep)
     res = _llamar_claude(SISTEMA_CAMPANA, contenido, HERRAMIENTA_CAMPANA, max_tokens=1500)
     res["fecha"] = _ahora()
     return res
@@ -1065,6 +1163,8 @@ def api_editar(pid):
         p = datos["perfiles"].get(pid)
         if p:
             _aplicar_campos(p, body)
+            if p.get("metricas"):  # la afinidad del equipo cambia el score sin reanalizar
+                p["score"] = calcular_score(p["metricas"], p.get("ia"), p.get("afinidad_equipo"))
         return p
     p = _modificar(editar)
     return jsonify({"perfil": p}) if p else _error("Perfil no encontrado.", 404)
@@ -1092,6 +1192,32 @@ def api_analizar(pid):
         return actual
     actual = _modificar(guardar)
     return jsonify({"perfil": actual}) if actual else _error("Perfil no encontrado.", 404)
+
+
+@creators_bp.route("/api/creators/perfiles/<pid>/para-claude")
+def api_para_claude(pid):
+    p = _leer()["perfiles"].get(pid)
+    if not p:
+        return _error("Perfil no encontrado.", 404)
+    return jsonify({"texto": texto_para_chat_perfil(p)})
+
+
+@creators_bp.route("/api/creators/perfiles/<pid>/analisis", methods=["POST"])
+def api_pegar_analisis(pid):
+    try:
+        ia = leer_json_pegado(_body().get("texto"), HERRAMIENTA_PERFIL)
+    except ValueError as e:
+        return _error(str(e))
+
+    def guardar(datos):
+        p = datos["perfiles"].get(pid)
+        if p:
+            p["ia"] = ia
+            p["score"] = calcular_score(p.get("metricas") or {}, ia, p.get("afinidad_equipo"))
+            p["actualizado"] = _ahora()
+        return p
+    p = _modificar(guardar)
+    return jsonify({"perfil": p}) if p else _error("Perfil no encontrado.", 404)
 
 
 @creators_bp.route("/api/creators/perfiles/<pid>", methods=["DELETE"])
@@ -1222,6 +1348,31 @@ def api_actualizar_campana(cid):
         return _error("Campaña no encontrada.", 404)
     res["avisos"] = avisos
     return jsonify(res)
+
+
+@creators_bp.route("/api/creators/campanas/<cid>/para-claude")
+def api_campana_para_claude(cid):
+    datos = _leer()
+    c = datos["campanas"].get(cid)
+    if not c:
+        return _error("Campaña no encontrada.", 404)
+    return jsonify({"texto": texto_para_chat_campana(c, reporte_campana(c, datos["perfiles"]))})
+
+
+@creators_bp.route("/api/creators/campanas/<cid>/conclusiones-pegadas", methods=["POST"])
+def api_pegar_conclusiones(cid):
+    try:
+        conc = leer_json_pegado(_body().get("texto"), HERRAMIENTA_CAMPANA)
+    except ValueError as e:
+        return _error(str(e))
+
+    def guardar(datos):
+        c = datos["campanas"].get(cid)
+        if c:
+            c["conclusiones"] = conc
+            return _campana_completa(datos, c)
+    res = _modificar(guardar)
+    return jsonify(res) if res else _error("Campaña no encontrada.", 404)
 
 
 @creators_bp.route("/api/creators/campanas/<cid>/conclusiones", methods=["POST"])

@@ -14,7 +14,20 @@
 
 <div class="cr-cols">
   <div class="card"><h2>Alertas</h2><div id="f-alertas"></div></div>
-  <div class="card"><h2>Análisis con IA</h2><div id="f-ia"></div></div>
+  <div class="card"><h2>Análisis con Claude</h2><div id="f-ia"></div>
+    <div class="no-imprimir" style="margin-top:14px;border-top:1px solid var(--gris-borde);padding-top:12px">
+      <div class="cr-mini" style="margin-bottom:8px"><b>Cómo:</b> 1) “Copiar para Claude” · 2) pégalo en un chat con Claude ·
+        3) copia su respuesta completa y pégala aquí abajo.</div>
+      <div class="cr-acciones">
+        <button class="btn btn-gris btn-sm" id="f-copiar">Copiar para Claude</button>
+        <a class="cr-mini" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir Claude ↗</a>
+        <span id="f-copiado" class="cr-mini"></span>
+      </div>
+      <textarea id="f-pegar" rows="4" placeholder="Pega aquí la respuesta de Claude" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--gris-borde);border-radius:8px;font-size:13px;font-family:inherit"></textarea>
+      <button class="btn btn-verde btn-sm" id="f-guardar-ia" style="margin-top:8px">Guardar análisis</button>
+      <span id="f-ia-msg" class="cr-mini"></span>
+    </div>
+  </div>
 </div>
 
 <div class="card"><h2>Publicaciones recientes</h2><div class="cr-tabla" id="f-posts"></div></div>
@@ -75,7 +88,7 @@ function pintar(datos) {
     <div class="num" style="color:${color}">${s.total ?? "—"}</div>
     <div class="nivel" style="color:${color}">${CR.esc(s.nivel || "")}</div>
     <div class="cr-barras">${barras}</div>
-    ${s.afinidad === null || s.afinidad === undefined ? '<div class="cr-mini">Sin análisis de IA: la afinidad no entra en el score.</div>' : ""}`;
+    ${s.afinidad === null || s.afinidad === undefined ? '<div class="cr-mini">Sin afinidad todavía: califícala en “Datos del perfil” o pega un análisis de Claude.</div>' : ""}`;
 
   const ref = m.er_referencia ? `Esperado para cuenta ${CR.esc((m.nivel_cuenta || "").toLowerCase())}: ${CR.num(m.er_referencia[0], 1)}–${CR.num(m.er_referencia[1], 1)}%` : "";
   document.getElementById("f-kpis").innerHTML = [
@@ -106,8 +119,8 @@ function pintar(datos) {
     ${ia.tono ? `<div class="cr-etq">Tono</div><div style="font-size:14px">${CR.esc(ia.tono)}</div>` : ""}
     ${ia.publico_estimado ? `<div class="cr-etq">Público estimado</div><div style="font-size:14px">${CR.esc(ia.publico_estimado)}</div>` : ""}
     ${ia.ideas_colaboracion && ia.ideas_colaboracion.length ? `<div class="cr-etq">Ideas de colaboración</div>${lst(ia.ideas_colaboracion)}` : ""}
-    <div class="cr-mini" style="margin-top:12px">Análisis del ${CR.fecha(ia.fecha)}. Es una lectura automática: confírmala antes de decidir.</div>` :
-    '<div class="cr-mini">{% if ia_ok %}Este perfil no tiene análisis con IA. Usa “Guardar y volver a analizar” con la casilla “con IA”.{% else %}La IA no está conectada todavía.{% endif %}</div>';
+    <div class="cr-mini" style="margin-top:12px">Análisis del ${CR.fecha(ia.fecha)}${ia.fuente === "chat" ? " (pegado desde el chat)" : ""}. Es una lectura de Claude: confírmala antes de decidir.</div>` :
+    '<div class="cr-mini">Este perfil todavía no tiene análisis de Claude.</div>';
 
   const posts = P.posts || [];
   const seg = m.seguidores || 0;
@@ -170,6 +183,24 @@ async function guardar(reanalizar) {
   } finally { CR.cargando(false); }
 }
 
+document.getElementById("f-copiar").addEventListener("click", async () => {
+  const msg = document.getElementById("f-copiado");
+  try {
+    const { texto } = await CR.api(`/api/creators/perfiles/${PID}/para-claude`);
+    msg.textContent = (await CR.copiar(texto)) ? "Copiado. Pégalo en Claude." : "No se pudo copiar.";
+  } catch (e) { msg.textContent = e.message; }
+});
+document.getElementById("f-guardar-ia").addEventListener("click", async () => {
+  const msg = document.getElementById("f-ia-msg");
+  const texto = document.getElementById("f-pegar").value;
+  if (!texto.trim()) { msg.textContent = "Pega primero la respuesta de Claude."; return; }
+  try {
+    await CR.api(`/api/creators/perfiles/${PID}/analisis`, { method: "POST", body: { texto } });
+    document.getElementById("f-pegar").value = "";
+    await cargar();
+    msg.innerHTML = '<span style="color:var(--verde)">Análisis guardado y score actualizado.</span>';
+  } catch (e) { msg.innerHTML = `<span style="color:var(--rojo)">${CR.esc(e.message)}</span>`; }
+});
 document.getElementById("f-guardar").addEventListener("click", () => guardar(false));
 document.getElementById("f-reanalizar").addEventListener("click", () => guardar(true));
 document.getElementById("f-borrar").addEventListener("click", async () => {

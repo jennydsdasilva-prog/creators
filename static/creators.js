@@ -61,5 +61,14 @@ const CR = (() => {
     document.getElementById("cr-cargando-txt").textContent = texto || "Cargando…";
     el.classList.toggle("ver", !!ver);
   }
-  return { api, esc, num, corto, pct, dinero, fecha, score, claseScore, avatar, chips, cargando };
+  async function copiar(texto) {
+    try { await navigator.clipboard.writeText(texto); return true; }
+    catch (e) {
+      const t = document.createElement("textarea");
+      t.value = texto; t.style.position = "fixed"; t.style.opacity = "0";
+      document.body.appendChild(t); t.select();
+      const ok = document.execCommand("copy"); t.remove(); return ok;
+    }
+  }
+  return { copiar, api, esc, num, corto, pct, dinero, fecha, score, claseScore, avatar, chips, cargando };
 })();

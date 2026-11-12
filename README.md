@@ -71,7 +71,14 @@ La app puede quedar en modo desarrollo: solo la usan personas con rol en ella.
 marcando “Cargar las métricas a mano”. Meta tampoco deja leer los comentarios de otras cuentas: para que la IA juzgue mejor la
 autenticidad, se pueden pegar comentarios de muestra en la ficha.
 
-## Conectar la IA (Claude)
+## Análisis con Claude sin API (gratis, con el plan de Claude)
+
+- **Afinidad del equipo:** en cada ficha se califica de 1 a 5 qué tan bien encaja el perfil con la marca. Entra al score como afinidad.
+- **Copiar para Claude:** el botón arma un texto con todos los datos del perfil. Se pega en un chat con Claude, y su respuesta
+  (que termina en un bloque JSON) se pega de vuelta en la ficha con “Guardar análisis”. Lo mismo en el reporte de campaña para las conclusiones.
+- Si hay afinidad del equipo y análisis de Claude, la afinidad del score es el promedio de las dos.
+
+## Conectar la IA por API (opcional, de pago)
 
 1. En **console.anthropic.com** crear una cuenta de la empresa, cargar saldo y generar una **API key**.
 2. Cargarla en Render como `ANTHROPIC_API_KEY`.

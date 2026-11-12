@@ -1,8 +1,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='creators.css') }}">
 <script src="{{ url_for('static', filename='creators.js') }}"></script>
-{% if not meta_ok or not ia_ok %}
+{% if not meta_ok %}
 <div class="cr-aviso info no-imprimir">
-  {% if not meta_ok %}<b>Instagram sin conectar:</b> los perfiles se cargan en modo manual hasta configurar META_ACCESS_TOKEN y META_IG_USER_ID en Render.{% endif %}
-  {% if not ia_ok %}{% if not meta_ok %}<br>{% endif %}<b>IA sin conectar:</b> el score se calcula solo con métricas hasta configurar ANTHROPIC_API_KEY.{% endif %}
+  <b>Instagram sin conectar:</b> los perfiles se cargan en modo manual hasta configurar META_ACCESS_TOKEN y META_IG_USER_ID en Render.
 </div>
 {% endif %}
