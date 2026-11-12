@@ -38,6 +38,15 @@
     <div class="hint">Cortas, de menos de 20 caracteres.</div></div>
   <div class="campo"><label for="c-tiktok">TikTok</label><input id="c-tiktok" maxlength="80" placeholder="@usuario"></div>
 </div>
+<div class="seccion-titulo">Audiencia (de sus estadísticas)</div>
+<div class="hint" style="margin:-4px 0 10px">Instagram no comparte de dónde son los seguidores de otras cuentas. Cárgalo de las capturas o el media kit que mande el influencer. Si no coincide con el país (mercado asignado), la herramienta avisa.</div>
+<div class="cr-grid-3">
+  <div class="campo"><label for="c-audiencia_paises">Países principales</label><input id="c-audiencia_paises" maxlength="200" placeholder="Ej: Panamá 70%, Colombia 10%"></div>
+  <div class="campo"><label for="c-audiencia_ciudades">Ciudades principales</label><input id="c-audiencia_ciudades" maxlength="200" placeholder="Ej: Panamá 55%, David 8%"></div>
+  <div class="campo"><label for="c-audiencia_mujeres">% mujeres</label><input id="c-audiencia_mujeres" maxlength="10" inputmode="decimal" placeholder="Ej: 62"></div>
+  <div class="campo"><label for="c-audiencia_edades">Edades principales</label><input id="c-audiencia_edades" maxlength="120" placeholder="Ej: 25-34 45%, 18-24 30%"></div>
+  <div class="campo"><label for="c-audiencia_fuente">Fuente</label><input id="c-audiencia_fuente" maxlength="120" placeholder="Ej: capturas del influencer, nov 2026"></div>
+</div>
 <div class="seccion-titulo">Contacto y condiciones</div>
 <div class="cr-grid-3">
   <div class="campo"><label for="c-email">Email</label><input id="c-email" type="email" maxlength="160"></div>
@@ -69,7 +78,7 @@
 </details>
 
 <script>
-const CAMPOS_TEXTO = ["usuario", "plataforma", "en_analisis_desde", "origen", "afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
+const CAMPOS_TEXTO = ["audiencia_paises", "audiencia_ciudades", "audiencia_mujeres", "audiencia_edades", "audiencia_fuente", "usuario", "plataforma", "en_analisis_desde", "origen", "afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
 const CAMPOS_MANUAL = ["seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post"];
 function leerCampos() {
   const b = {};

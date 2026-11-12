@@ -93,6 +93,10 @@ NIVELES_CUENTA = [
     ("Mega", 1_000_000, float("inf"), (0.4, 1.5)),
 ]
 
+# Likes ocultos: desde este % de publicaciones no hay score; por debajo, el score tiene tope.
+OCULTOS_SIN_SCORE = 50
+TOPE_OCULTOS = 70
+
 PESOS = {"engagement": 30, "autenticidad": 25, "afinidad": 25, "actividad": 20}
 
 # Para detectar menciones en los textos de los posts.
@@ -360,6 +364,12 @@ def calcular_metricas(datos, posts, historial=None):
     muestra = (maduros if len(maduros) >= 6 else [p for p, _ in con_fecha])[:20]
 
     likes_ocultos = any(p.get("likes") is None for p in muestra) and bool(muestra)
+    pct_ocultos = round(sum(1 for p in muestra if p.get("likes") is None) / len(muestra) * 100) if muestra else 0
+    # Si oculta los likes en algunos posts, el engagement se mide solo con los que
+    # sí los muestran (contar esos posts como 0 likes lo hundiría sin razón).
+    visibles = [p for p in muestra if p.get("likes") is not None]
+    if likes_ocultos and len(visibles) >= 3:
+        muestra = visibles
     inter = [(p.get("likes") or 0) + (p.get("comentarios") or 0) for p in muestra]
     likes = [p.get("likes") or 0 for p in muestra]
     coms = [p.get("comentarios") or 0 for p in muestra]
@@ -370,6 +380,7 @@ def calcular_metricas(datos, posts, historial=None):
         "seguidos": seguidos,
         "posts_analizados": len(muestra),
         "likes_ocultos": likes_ocultos,
+        "pct_likes_ocultos": pct_ocultos,
     }
     nivel, rango = nivel_cuenta(seguidores)
     m["nivel_cuenta"], m["er_referencia"] = nivel, list(rango)
@@ -460,8 +471,13 @@ def alertas(m):
     """Señales a revisar, en lenguaje de equipo. (texto, gravedad)."""
     a = []
     er, (bajo, alto) = m.get("er"), m.get("er_referencia", [1, 3])
-    if m.get("likes_ocultos"):
-        a.append(("La cuenta oculta los likes: el engagement se calculó solo con comentarios y puede estar subestimado. Pide sus estadísticas.", "info"))
+    pct = m.get("pct_likes_ocultos") or (100 if m.get("likes_ocultos") else 0)
+    if pct >= OCULTOS_SIN_SCORE:
+        a.append((f"Oculta los likes en el {pct}% de sus publicaciones: su engagement no se puede verificar, por eso no tiene score. "
+                  "Pide capturas de sus estadísticas antes de decidir.", "media"))
+    elif pct > 0:
+        a.append((f"Oculta los likes en el {pct}% de sus publicaciones: el engagement se calculó con las que sí los muestran "
+                  f"y el score queda limitado a {TOPE_OCULTOS} hasta verificar sus estadísticas.", "info"))
     if er is not None:
         if er < bajo * 0.4:
             a.append((f"Engagement muy bajo para su tamaño ({er}% vs. {bajo}–{alto}% esperado). Posible audiencia inactiva o seguidores comprados.", "alta"))
@@ -571,11 +587,17 @@ def calcular_score(m, ia=None, afinidad_equipo=None):
     if partes["engagement"] is None:
         # Sin engagement no hay score: la afinidad sola daría una nota engañosa.
         return {**partes, "total": None, "nivel": "Falta engagement"}
+    pct = m.get("pct_likes_ocultos") or (100 if m.get("likes_ocultos") else 0)
+    if pct >= OCULTOS_SIN_SCORE:
+        # Con la mayoría de los likes ocultos no se puede verificar: mejor sin nota que una nota inflada.
+        return {**partes, "total": None, "nivel": "No verificable"}
     peso = sum(PESOS[k] for k in con_valor)
     total = round(sum(v * PESOS[k] for k, v in con_valor.items()) / peso)
     # Una alerta grave (likes comprados, crecimiento sospechoso…) pesa aunque el
     # resto de las métricas se vea bien.
     total = max(0, total - min(18, 6 * sum(1 for a in alertas(m) if a["gravedad"] == "alta")))
+    if pct > 0:
+        total = min(total, TOPE_OCULTOS)  # no puede salir "Recomendado" sin verificar sus likes
     nivel = "Recomendado" if total >= 75 else "Potencial" if total >= 60 else "Revisar" if total >= 45 else "No recomendado"
     return {**partes, "total": total, "nivel": nivel}
 
@@ -692,6 +714,9 @@ def contexto_perfil(perfil, m, alertas_lista):
         f"({datos.get('nombre') or perfil.get('nombre_contacto') or 'sin nombre'}) · plataforma: {perfil.get('plataforma') or 'instagram'}\n"
         f"En análisis desde: {perfil.get('en_analisis_desde') or 'sin dato'} · Origen: {perfil.get('origen') or 'sin dato'} · "
         f"Tarifa/costo: {perfil.get('tarifa') or 'sin dato'}\n"
+        f"Audiencia (según sus estadísticas): países {perfil.get('audiencia_paises') or 'sin dato'} · ciudades "
+        f"{perfil.get('audiencia_ciudades') or 'sin dato'} · mujeres {perfil.get('audiencia_mujeres') or 'sin dato'}% · "
+        f"edades {perfil.get('audiencia_edades') or 'sin dato'} · fuente {perfil.get('audiencia_fuente') or 'sin dato'}\n"
         f"País indicado por el equipo: {perfil.get('pais') or 'sin dato'}\n"
         f"Nicho indicado por el equipo: {perfil.get('nicho') or 'sin dato'}\n"
         f"Biografía: {datos.get('biografia') or 'sin dato'}\n"
@@ -835,9 +860,7 @@ def analizar(perfil, con_ia=True):
     else:
         m = calcular_metricas(perfil["datos"], perfil["posts"], perfil.get("historial"))
 
-    lista_alertas = alertas(m)
-    if perfil.get("no_profesional"):
-        lista_alertas.insert(0, {"gravedad": "info", "texto": AVISO_NO_PROFESIONAL})
+    lista_alertas = alertas_extra(perfil) + alertas(m)
     ia = perfil.get("ia")
     if con_ia and ia_configurada() and (m.get("seguidores") or perfil.get("posts")):
         try:
@@ -868,11 +891,50 @@ AVISO_NO_PROFESIONAL = (
     "publicaciones y biografía). Para medirla, pide capturas de sus estadísticas o carga los promedios a mano."
 )
 
+def _sin_acentos(t):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", (t or "").lower()) if unicodedata.category(c) != "Mn")
+
+
+def alertas_extra(perfil):
+    """Avisos que salen de datos del perfil, no de las métricas de Instagram."""
+    a = []
+    if perfil.get("no_profesional"):
+        a.append({"gravedad": "info", "texto": AVISO_NO_PROFESIONAL})
+    mercado = (perfil.get("pais") or "").strip()
+    paises = perfil.get("audiencia_paises") or ""
+    ciudades = perfil.get("audiencia_ciudades") or ""
+    if mercado and (paises or ciudades):
+        texto = _sin_acentos(paises + " " + ciudades)
+        clave = _sin_acentos(mercado)
+        # Ciudades principales por país, para cuando solo cargan ciudades.
+        ciudades_pais = {
+            "panama": ["panama", "colon", "david", "chiriqui", "santiago", "chitre", "la chorrera", "arraijan", "san miguelito"],
+            "colombia": ["bogota", "medellin", "cali", "barranquilla", "cartagena", "bucaramanga", "pereira", "manizales", "santa marta", "cucuta"],
+            "costa rica": ["san jose", "alajuela", "heredia", "cartago", "liberia", "puntarenas", "limon"],
+            "el salvador": ["san salvador", "santa ana", "san miguel", "soyapango", "santa tecla"],
+            "guatemala": ["guatemala", "mixco", "quetzaltenango", "villa nueva", "antigua"],
+            "ecuador": ["guayaquil", "quito", "cuenca", "manta", "machala"],
+            "venezuela": ["caracas", "maracaibo", "valencia", "barquisimeto", "maracay", "maturin"],
+            "republica dominicana": ["santo domingo", "santiago de los caballeros", "punta cana", "la romana"],
+            "honduras": ["tegucigalpa", "san pedro sula", "la ceiba"],
+            "mexico": ["ciudad de mexico", "cdmx", "guadalajara", "monterrey", "puebla"],
+        }
+        coincide = clave in texto or any(c in texto for c in ciudades_pais.get(clave, []))
+        if coincide:
+            a.append({"gravedad": "info", "texto": f"Su audiencia coincide con el mercado asignado ({mercado})."})
+        else:
+            donde = paises or ciudades
+            a.append({"gravedad": "media", "texto": f"Su audiencia principal está en {donde[:80]}, pero el mercado asignado es {mercado}. Revisa si le conviene a la campaña."})
+    return a
+
+
 CAMPOS_MANUALES = ("seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post")
 
 
 def _aplicar_campos(perfil, body):
-    textos = {"origen": 80, "nombre_contacto": 120, "pais": 60, "ciudad": 80, "nicho": 120, "tiktok": 80,
+    textos = {"audiencia_paises": 200, "audiencia_ciudades": 200, "audiencia_edades": 120,
+              "audiencia_mujeres": 10, "audiencia_fuente": 120, "origen": 80, "nombre_contacto": 120, "pais": 60, "ciudad": 80, "nicho": 120, "tiktok": 80,
               "email": 160, "telefono": 60, "tarifa": 120, "notas": 4000, "responsable": 80,
               "comentarios_muestra": 6000}
     for campo, maximo in textos.items():
@@ -925,6 +987,7 @@ def resumen_perfil(p):
         "recomendacion": (p.get("ia") or {}).get("recomendacion"),
         "marca_sugerida": _marca_corta((p.get("ia") or {}).get("mejor_marca")),
         "no_profesional": bool(p.get("no_profesional")),
+        "audiencia": (p.get("audiencia_ciudades") or p.get("audiencia_paises") or "")[:60],
         "nichos": (p.get("ia") or {}).get("nichos") or [],
         "alertas_altas": sum(1 for a in p.get("alertas") or [] if a.get("gravedad") == "alta"),
         "fuente": p.get("fuente"), "actualizado": p.get("analizado") or p.get("actualizado"),
@@ -1269,7 +1332,8 @@ def api_editar(pid):
         p = datos["perfiles"].get(pid)
         if p:
             _aplicar_campos(p, body)
-            if p.get("metricas"):  # la afinidad del equipo cambia el score sin reanalizar
+            if p.get("metricas"):  # la afinidad y la audiencia cambian sin reanalizar
+                p["alertas"] = alertas_extra(p) + alertas(p["metricas"])
                 p["score"] = calcular_score(p["metricas"], p.get("ia"), p.get("afinidad_equipo"))
         return p
     p = _modificar(editar)
@@ -1332,7 +1396,7 @@ def api_cargar_instagram(pid):
         p["datos"], p["posts"], p["fuente"] = datos_ig, posts, "navegador"
         p["manual"] = {k: "" for k in CAMPOS_MANUALES}
         m = calcular_metricas(datos_ig, posts, p.get("historial"))
-        p["metricas"], p["alertas"] = m, alertas(m)
+        p["metricas"], p["alertas"] = m, alertas_extra(p) + alertas(m)
         p["score"] = calcular_score(m, p.get("ia"), p.get("afinidad_equipo"))
         p["errores"], p["analizado"], p["actualizado"] = [], _ahora(), _ahora()
         if m.get("seguidores"):
@@ -1388,7 +1452,7 @@ def api_exportar():
     w = csv.writer(salida)
     w.writerow(["Usuario", "Enlace", "Nombre", "País", "Ciudad", "Marcas", "Nicho", "Estado", "Seguidores",
                 "Nivel cuenta", "Engagement %", "Score", "Nivel", "Recomendación IA", "Email", "Teléfono",
-                "Tarifa", "TikTok", "Etiquetas", "En análisis desde", "Origen", "Analizado"])
+                "Tarifa", "TikTok", "Etiquetas", "En análisis desde", "Origen", "Audiencia países", "Audiencia ciudades", "Analizado"])
     for p in _leer()["perfiles"].values():
         r, m = resumen_perfil(p), p.get("metricas") or {}
         w.writerow([f"@{p['usuario']}" if p.get("usuario") else "", f"https://instagram.com/{p['usuario']}" if p.get("usuario") else "", r["nombre"], p.get("pais", ""),
@@ -1397,7 +1461,8 @@ def api_exportar():
                     str(m.get("er") or "").replace(".", ","), r["score"] if r["score"] is not None else "",
                     r["nivel"] or "", r["recomendacion"] or "", p.get("email", ""), p.get("telefono", ""),
                     p.get("tarifa", ""), p.get("tiktok", ""), ", ".join(r["etiquetas"]),
-                    r["en_analisis_desde"], p.get("origen", ""), (r["actualizado"] or "")[:10]])
+                    r["en_analisis_desde"], p.get("origen", ""), p.get("audiencia_paises", ""),
+                    p.get("audiencia_ciudades", ""), (r["actualizado"] or "")[:10]])
     # BOM para que Excel abra bien los acentos.
     return Response("\ufeff" + salida.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=creators-piazza-{_hoy()}.csv"})

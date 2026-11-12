@@ -78,6 +78,7 @@ function pintar(datos) {
       ${d.biografia ? `<div class="bio">${CR.esc(d.biografia)}</div>` : ""}
       ${d.web ? `<div class="meta"><a href="${CR.esc(d.web)}" target="_blank" rel="noopener">${CR.esc(d.web)}</a></div>` : ""}
       <div style="margin-top:8px">${CR.chips(P.marcas)}${CR.chips((ia && ia.nichos) || [])}${CR.chips(P.etiquetas)}</div>
+      ${P.audiencia_paises || P.audiencia_ciudades ? `<div class="meta" style="margin-top:8px">Audiencia: ${[P.audiencia_paises, P.audiencia_ciudades, P.audiencia_mujeres && P.audiencia_mujeres + "% mujeres", P.audiencia_edades].filter(Boolean).map(CR.esc).join(" · ")}${P.audiencia_fuente ? " <span class='cr-mini'>(" + CR.esc(P.audiencia_fuente) + ")</span>" : ""}</div>` : ""}
       ${P.email || P.telefono || P.tarifa ? `<div class="meta" style="margin-top:8px">${[P.email, P.telefono, P.tarifa && "Tarifa: " + P.tarifa].filter(Boolean).map(CR.esc).join(" · ")}</div>` : ""}
       <div class="cr-mini" style="margin-top:8px">En análisis desde <b>${CR.fecha(P.en_analisis_desde || (P.creado || "").slice(0, 10))}</b>${P.origen ? " · Origen: " + CR.esc(P.origen) : ""}${P.plataforma === "tiktok" ? " · Red principal: TikTok" : ""}
         · Analizado ${CR.fecha(P.analizado)} · datos ${P.fuente === "meta" ? "de Instagram (API)" : P.fuente === "navegador" ? "públicos de Instagram (leídos desde el navegador)" : "cargados a mano"}</div>

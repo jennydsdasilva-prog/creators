@@ -18,7 +18,8 @@
     <select id="f-pais"><option value="">Todos los países</option></select>
     <select id="f-estado"><option value="">Todos los estados</option>{% for e in estados %}<option>{{ e }}</option>{% endfor %}</select>
     <select id="f-nivel"><option value="">Todos los niveles</option>
-      <option>Recomendado</option><option>Potencial</option><option>Revisar</option><option>No recomendado</option></select>
+      <option>Recomendado</option><option>Potencial</option><option>Revisar</option><option>No recomendado</option>
+      <option>No verificable</option><option>Falta engagement</option></select>
   </div>
   <div class="cr-mini" style="margin-bottom:8px"><span class="cr-chip">OP</span> marca elegida por el equipo · <span class="cr-chip cr-sugerida">★ Lotto</span> marca sugerida por Claude</div>
   <div class="cr-tabla">
@@ -80,12 +81,12 @@ function pintar() {
     <tr onclick="location.href='/creators/p/${p.id}'">
       <td><div class="cr-persona">${CR.avatar(p.foto, p.usuario || p.nombre)}<div><b>${p.usuario ? "@" + CR.esc(p.usuario) : CR.esc(p.nombre)}</b>
         <span>${p.usuario ? CR.esc(p.nombre) : "<i>sin usuario</i>"}${p.plataforma === "tiktok" ? " · TikTok" : ""}${p.no_profesional ? ' · <span title="Instagram no comparte sus estadísticas">no profesional</span>' : ""}</span></div></div></td>
-      <td>${CR.esc(p.pais) || "—"}</td>
+      <td>${CR.esc(p.pais) || "—"}${p.audiencia ? `<div class="cr-mini" title="Audiencia según sus estadísticas">👥 ${CR.esc(p.audiencia)}</div>` : ""}</td>
       <td>${marcas(p)}</td>
       <td class="cr-mini">${CR.esc(p.nicho_txt) || "—"}</td>
       <td class="cr-num">${CR.corto(p.seguidores)}<div class="cr-mini">${CR.esc(p.nivel_cuenta || "")}</div></td>
       <td class="cr-num">${CR.pct(p.er)}</td>
-      <td class="cr-num">${CR.score(p.score)}${p.alertas_altas ? `<div class="cr-mini" style="color:var(--rojo)">${p.alertas_altas} alerta${p.alertas_altas > 1 ? "s" : ""}</div>` : ""}</td>
+      <td class="cr-num">${CR.score(p.score)}${p.score === null && p.nivel && p.nivel !== "Sin datos" ? `<div class="cr-mini">${CR.esc(p.nivel)}</div>` : ""}${p.alertas_altas ? `<div class="cr-mini" style="color:var(--rojo)">${p.alertas_altas} alerta${p.alertas_altas > 1 ? "s" : ""}</div>` : ""}</td>
       <td>${CR.esc(p.estado)}${p.campana_activa ? `<div class="cr-mini">En: ${CR.esc(p.campana_activa)}</div>` : ""}</td>
       <td class="cr-mini">${CR.fecha(p.en_analisis_desde)}</td>
     </tr>`).join("");
