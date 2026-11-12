@@ -75,7 +75,7 @@ function pintar() {
   tb.innerHTML = lista.map((p) => `
     <tr onclick="location.href='/creators/p/${p.id}'">
       <td><div class="cr-persona">${CR.avatar(p.foto, p.usuario || p.nombre)}<div><b>${p.usuario ? "@" + CR.esc(p.usuario) : CR.esc(p.nombre)}</b>
-        <span>${p.usuario ? CR.esc(p.nombre) : "<i>sin usuario</i>"}${p.plataforma === "tiktok" ? " · TikTok" : ""}</span></div></div></td>
+        <span>${p.usuario ? CR.esc(p.nombre) : "<i>sin usuario</i>"}${p.plataforma === "tiktok" ? " · TikTok" : ""}${p.no_profesional ? ' · <span title="Instagram no comparte sus estadísticas">no profesional</span>' : ""}</span></div></div></td>
       <td>${CR.esc(p.pais) || "—"}</td>
       <td>${marcas(p)}</td>
       <td class="cr-mini" style="max-width:170px">${CR.esc(p.nicho_txt) || "—"}</td>

@@ -805,9 +805,14 @@ def analizar(perfil, con_ia=True):
             ig = consultar_instagram(perfil["usuario"])
             perfil["datos"], perfil["posts"] = ig["datos"], ig["posts"]
             perfil["fuente"] = "meta"
+            perfil["no_profesional"] = False
         except ErrorMeta as e:
             usar_manual = True
-            if _numero((perfil.get("manual") or {}).get("seguidores")):
+            existe = (perfil.get("datos") or {}).get("seguidores")  # leída antes desde el navegador
+            if "no encontró" in str(e) and existe:
+                # La cuenta existe pero no es profesional: no es un error, es una limitación.
+                perfil["no_profesional"] = True
+            elif _numero((perfil.get("manual") or {}).get("seguidores")):
                 errores.append(f"Se usaron los datos cargados a mano porque Instagram no respondió: {e}")
             else:
                 errores.append(str(e))
@@ -831,6 +836,8 @@ def analizar(perfil, con_ia=True):
         m = calcular_metricas(perfil["datos"], perfil["posts"], perfil.get("historial"))
 
     lista_alertas = alertas(m)
+    if perfil.get("no_profesional"):
+        lista_alertas.insert(0, {"gravedad": "info", "texto": AVISO_NO_PROFESIONAL})
     ia = perfil.get("ia")
     if con_ia and ia_configurada() and (m.get("seguidores") or perfil.get("posts")):
         try:
@@ -854,6 +861,12 @@ def analizar(perfil, con_ia=True):
 
 
 # ─── Perfiles: campos editables ───────────────────────────────────────────────
+
+AVISO_NO_PROFESIONAL = (
+    "Cuenta sin perfil profesional en Instagram: Meta no comparte sus likes, comentarios ni vistas, "
+    "por eso no hay engagement ni score. Solo se ven los datos públicos del perfil (seguidores, seguidos, "
+    "publicaciones y biografía). Para medirla, pide capturas de sus estadísticas o carga los promedios a mano."
+)
 
 CAMPOS_MANUALES = ("seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post")
 
@@ -902,6 +915,7 @@ def resumen_perfil(p):
         "score": s.get("total"), "nivel": s.get("nivel"),
         "recomendacion": (p.get("ia") or {}).get("recomendacion"),
         "marca_sugerida": (p.get("ia") or {}).get("mejor_marca") or "",
+        "no_profesional": bool(p.get("no_profesional")),
         "nichos": (p.get("ia") or {}).get("nichos") or [],
         "alertas_altas": sum(1 for a in p.get("alertas") or [] if a.get("gravedad") == "alta"),
         "fuente": p.get("fuente"), "actualizado": p.get("analizado") or p.get("actualizado"),
@@ -1269,7 +1283,7 @@ def api_analizar(pid):
         # Conserva lo que el equipo haya editado mientras corría el análisis.
         actual = datos["perfiles"][pid]
         for k in ("datos", "posts", "metricas", "alertas", "ia", "score", "errores", "analizado",
-                  "historial", "fuente", "manual", "modo", "comentarios_muestra"):
+                  "historial", "fuente", "manual", "modo", "comentarios_muestra", "no_profesional"):
             actual[k] = p.get(k)
         actual["actualizado"] = _ahora()
         return actual

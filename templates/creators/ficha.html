@@ -103,7 +103,7 @@ function pintar(datos) {
     kpi(m.posts_semana ?? "—", "Posts por semana", m.dias_ultimo_post !== undefined ? `Último hace ${m.dias_ultimo_post} días` : ""),
     kpi(CR.num(m.seguidos), "Seguidos", m.pct_reels !== undefined ? `${m.pct_reels}% de sus posts son reels` : ""),
   ].join("");
-  document.getElementById("f-kpis-nota").textContent = m.manual ? "Métricas cargadas a mano por el equipo." : !m.seguidores ? "Todavía sin métricas." :
+  document.getElementById("f-kpis-nota").textContent = P.no_profesional ? "Cuenta sin perfil profesional en Instagram: solo se ven sus datos públicos, sin likes ni comentarios." : m.manual ? "Métricas cargadas a mano por el equipo." : !m.seguidores ? "Todavía sin métricas." :
     `Calculado sobre ${m.posts_analizados || 0} posts (se excluyen los de menos de 48 h).${m.likes_ocultos ? " La cuenta oculta los likes en algunos posts." : ""}`;
 
   const al = P.alertas || [];
