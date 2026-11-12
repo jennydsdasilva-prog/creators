@@ -810,12 +810,16 @@ def analizar(perfil, con_ia=True):
                 errores.append(str(e))
 
     if usar_manual:
-        perfil["fuente"] = "manual"
+        perfil["fuente"] = "navegador" if perfil.get("posts") and not _numero((perfil.get("manual") or {}).get("seguidores")) else "manual"
         manual = perfil.get("manual") or {}
         datos = perfil.get("datos") or {}
         datos["seguidores"] = int(_numero(manual.get("seguidores")) or 0) or datos.get("seguidores")
         perfil["datos"] = datos
-        m = metricas_manuales(manual, perfil.get("historial"))
+        if perfil.get("posts") and not _numero(manual.get("seguidores")):
+            # Datos leídos antes desde el navegador: se recalculan con esos posts.
+            m = calcular_metricas(perfil.get("datos") or {}, perfil["posts"], perfil.get("historial"))
+        else:
+            m = metricas_manuales(manual, perfil.get("historial"))
         if not m.get("seguidores"):
             errores.append("Faltan datos: carga al menos seguidores y promedio de likes y comentarios.")
     else:
@@ -1264,6 +1268,50 @@ def api_analizar(pid):
         return actual
     actual = _modificar(guardar)
     return jsonify({"perfil": actual}) if actual else _error("Perfil no encontrado.", 404)
+
+
+@creators_bp.route("/api/creators/perfiles/<pid>/instagram", methods=["POST"])
+def api_cargar_instagram(pid):
+    """Recibe datos públicos del perfil leídos desde el navegador (seguidores, bio y
+    últimos posts con likes y comentarios) y recalcula métricas, alertas y score.
+    Sirve mientras no esté conectada la API de Meta."""
+    body = _body()
+    d = body.get("datos") or {}
+    posts = []
+    for x in (body.get("posts") or [])[:30]:
+        posts.append({
+            "fecha": _texto(x.get("fecha"), 40), "tipo": _texto(x.get("tipo"), 20),
+            "likes": int(x["likes"]) if isinstance(x.get("likes"), (int, float)) and x["likes"] >= 0 else None,
+            "comentarios": int(x.get("comentarios") or 0),
+            "vistas": int(x["vistas"]) if isinstance(x.get("vistas"), (int, float)) and x["vistas"] > 0 else None,
+            "enlace": _texto(x.get("enlace"), 300), "texto": _texto(x.get("texto"), 400),
+        })
+    datos_ig = {
+        "nombre": _texto(d.get("nombre"), 120), "biografia": _texto(d.get("biografia"), 600),
+        "web": _texto(d.get("web"), 300),
+        "seguidores": int(_numero(d.get("seguidores")) or 0) or None,
+        "seguidos": int(_numero(d.get("seguidos")) or 0) or None,
+        "publicaciones": int(_numero(d.get("publicaciones")) or 0) or None,
+        "foto": "",
+    }
+
+    def guardar(datos):
+        p = datos["perfiles"].get(pid)
+        if not p:
+            return None
+        p["datos"], p["posts"], p["fuente"] = datos_ig, posts, "navegador"
+        p["manual"] = {k: "" for k in CAMPOS_MANUALES}
+        m = calcular_metricas(datos_ig, posts, p.get("historial"))
+        p["metricas"], p["alertas"] = m, alertas(m)
+        p["score"] = calcular_score(m, p.get("ia"), p.get("afinidad_equipo"))
+        p["errores"], p["analizado"], p["actualizado"] = [], _ahora(), _ahora()
+        if m.get("seguidores"):
+            hist = [h for h in p.get("historial") or [] if h.get("fecha") != _hoy()]
+            hist.append({"fecha": _hoy(), "seguidores": m["seguidores"], "er": m.get("er"), "score": p["score"].get("total")})
+            p["historial"] = hist[-120:]
+        return p
+    p = _modificar(guardar)
+    return jsonify({"perfil": resumen_perfil(p)}) if p else _error("Perfil no encontrado.", 404)
 
 
 @creators_bp.route("/api/creators/perfiles/<pid>/para-claude")
