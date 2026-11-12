@@ -95,7 +95,15 @@ def inicio():
 
 @app.route("/api/salud", endpoint="salud")
 def salud():
-    return jsonify({"ok": True, "almacen": "dropbox" if almacen.hay_dropbox() else "local"})
+    """Para Render y para revisar la conexión: ?dropbox=1 prueba leer y escribir en Dropbox."""
+    res = {"ok": True, "almacen": "dropbox" if almacen.hay_dropbox() else "local"}
+    if request.args.get("dropbox") and almacen.hay_dropbox():
+        try:
+            almacen.escribir("salud.txt", b"ok")
+            res["dropbox_ok"] = almacen.leer("salud.txt") == b"ok"
+        except Exception as e:  # el detalle no expone claves
+            res.update(ok=False, dropbox_ok=False, error=type(e).__name__)
+    return jsonify(res)
 
 
 if __name__ == "__main__":
