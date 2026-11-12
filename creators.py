@@ -901,6 +901,8 @@ def resumen_perfil(p):
         "seguidores": m.get("seguidores"), "er": m.get("er"), "nivel_cuenta": m.get("nivel_cuenta"),
         "score": s.get("total"), "nivel": s.get("nivel"),
         "recomendacion": (p.get("ia") or {}).get("recomendacion"),
+        "marca_sugerida": (p.get("ia") or {}).get("mejor_marca") or "",
+        "nichos": (p.get("ia") or {}).get("nichos") or [],
         "alertas_altas": sum(1 for a in p.get("alertas") or [] if a.get("gravedad") == "alta"),
         "fuente": p.get("fuente"), "actualizado": p.get("analizado") or p.get("actualizado"),
     }
