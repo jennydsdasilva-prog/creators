@@ -68,8 +68,8 @@ function pintarParticipantes() {
       <td><button class="cr-x" title="Quitar" onclick="quitarPost(${i},${j})">✕</button></td></tr>`).join("");
     return `<div class="cr-part">
       <div class="cr-part-top">
-        <a class="cr-persona" href="/creators/p/${x.perfil_id}" style="text-decoration:none;color:inherit">${CR.avatar(p.foto, p.usuario)}
-          <div><b>@${CR.esc(p.usuario)}</b><span>${CR.corto(p.seguidores)} seguidores · ER ${CR.pct(p.er)}</span></div></a>
+        <a class="cr-persona" href="/creators/p/${x.perfil_id}" style="text-decoration:none;color:inherit">${CR.avatar(p.foto, p.usuario || p.nombre)}
+          <div><b>${p.usuario ? "@" + CR.esc(p.usuario) : CR.esc(p.nombre)}</b><span>${CR.corto(p.seguidores)} seguidores · ER ${CR.pct(p.er)}</span></div></a>
         <div class="campo"><label>Costo</label><input class="cr-input-mini" data-i="${i}" data-k="costo" inputmode="decimal" value="${x.costo ?? ""}"></div>
         <div class="campo" style="flex:1;min-width:200px"><label>Entregables</label><input data-i="${i}" data-k="entregables" maxlength="300" value="${CR.esc(x.entregables)}" placeholder="Ej: 2 reels + 3 historias"></div>
         <div class="campo"><label>Código de descuento</label><input data-i="${i}" data-k="codigo" maxlength="60" value="${CR.esc(x.codigo)}" style="width:150px"></div>
@@ -88,7 +88,7 @@ function pintarParticipantes() {
   }));
   const usados = new Set(parts.map((x) => x.perfil_id));
   document.getElementById("k-agregar").innerHTML = '<option value="">+ Agregar influencer de la base…</option>' +
-    TODOS.filter((p) => !usados.has(p.id)).map((p) => `<option value="${p.id}">@${CR.esc(p.usuario)}${p.nombre ? " — " + CR.esc(p.nombre) : ""}</option>`).join("");
+    TODOS.filter((p) => !usados.has(p.id)).map((p) => `<option value="${p.id}">${p.usuario ? "@" + CR.esc(p.usuario) + (p.nombre ? " — " + CR.esc(p.nombre) : "") : CR.esc(p.nombre)}</option>`).join("");
 }
 
 function pintar(datos) {
@@ -111,7 +111,7 @@ function agregarPost(i) { C.participantes[i].posts.push({ enlace: "", fuente: "m
 function quitarPost(i, j) { C.participantes[i].posts.splice(j, 1); CAMBIOS = true; pintarParticipantes(); }
 function quitarParticipante(i) {
   const p = PERFILES[C.participantes[i].perfil_id] || {};
-  if (!confirm(`¿Quitar a @${p.usuario || "?"} de la campaña?`)) return;
+  if (!confirm(`¿Quitar a ${p.usuario ? "@" + p.usuario : (p.nombre || "este perfil")} de la campaña?`)) return;
   C.participantes.splice(i, 1); CAMBIOS = true; pintarParticipantes();
 }
 

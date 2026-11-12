@@ -69,6 +69,8 @@ MARCAS = {
     "Rockland": "Rockland: calzado de estilo de vida.",
 }
 
+PLATAFORMAS = ["instagram", "tiktok", "otra"]
+
 ESTADOS = ["Candidato", "Contactado", "Negociando", "Activo", "Pausado", "Descartado"]
 ESTADOS_CAMPANA = ["Planificada", "Activa", "Cerrada"]
 
@@ -413,14 +415,15 @@ def metricas_manuales(manual, historial=None):
     likes = _numero(manual.get("likes_prom"))
     coms = _numero(manual.get("comentarios_prom"))
     m = {
-        "seguidores": int(seguidores),
+        "seguidores": int(seguidores) or None,  # None = todavía sin dato
         "seguidos": int(_numero(manual.get("seguidos"))) if _numero(manual.get("seguidos")) is not None else None,
         "posts_analizados": 0,
         "likes_ocultos": False,
         "manual": True,
     }
     nivel, rango = nivel_cuenta(seguidores)
-    m["nivel_cuenta"], m["er_referencia"] = nivel, list(rango)
+    m["nivel_cuenta"] = nivel if seguidores else None
+    m["er_referencia"] = list(rango)
     if seguidores and (likes is not None or coms is not None):
         inter = (likes or 0) + (coms or 0)
         m["interacciones_prom"] = round(inter, 1)
@@ -682,7 +685,10 @@ def contexto_perfil(perfil, m, alertas_lista):
     metricas_txt = {k: v for k, v in m.items() if k not in ("menciones_propias",)}
     contenido = (
         f"Marcas para las que se evalúa:\n{contexto_marcas}\n\n"
-        f"Perfil: @{perfil.get('usuario')} ({datos.get('nombre') or 'sin nombre'})\n"
+        f"Perfil: {'@' + perfil['usuario'] if perfil.get('usuario') else 'sin usuario registrado'} "
+        f"({datos.get('nombre') or perfil.get('nombre_contacto') or 'sin nombre'}) · plataforma: {perfil.get('plataforma') or 'instagram'}\n"
+        f"En análisis desde: {perfil.get('en_analisis_desde') or 'sin dato'} · Origen: {perfil.get('origen') or 'sin dato'} · "
+        f"Tarifa/costo: {perfil.get('tarifa') or 'sin dato'}\n"
         f"País indicado por el equipo: {perfil.get('pais') or 'sin dato'}\n"
         f"Nicho indicado por el equipo: {perfil.get('nicho') or 'sin dato'}\n"
         f"Biografía: {datos.get('biografia') or 'sin dato'}\n"
@@ -788,7 +794,8 @@ def leer_json_pegado(texto, herramienta):
 def analizar(perfil, con_ia=True):
     """Actualiza el perfil en el lugar: datos, posts, métricas, alertas, IA, score e historial."""
     errores = []
-    usar_manual = perfil.get("modo") == "manual" or not meta_configurado()
+    usar_manual = (perfil.get("modo") == "manual" or not meta_configurado() or not perfil.get("usuario")
+                   or (perfil.get("plataforma") or "instagram") != "instagram")
 
     if not usar_manual:
         try:
@@ -843,7 +850,7 @@ CAMPOS_MANUALES = ("seguidores", "seguidos", "likes_prom", "comentarios_prom", "
 
 
 def _aplicar_campos(perfil, body):
-    textos = {"nombre_contacto": 120, "pais": 60, "ciudad": 80, "nicho": 120, "tiktok": 80,
+    textos = {"origen": 80, "nombre_contacto": 120, "pais": 60, "ciudad": 80, "nicho": 120, "tiktok": 80,
               "email": 160, "telefono": 60, "tarifa": 120, "notas": 4000, "responsable": 80,
               "comentarios_muestra": 6000}
     for campo, maximo in textos.items():
@@ -858,6 +865,14 @@ def _aplicar_campos(perfil, body):
     if "afinidad_equipo" in body:
         n = _numero(body.get("afinidad_equipo"))
         perfil["afinidad_equipo"] = int(n) if n in (1, 2, 3, 4, 5) else None
+    if "en_analisis_desde" in body:
+        f = _texto(body.get("en_analisis_desde"), 10)
+        if f == "" or re.fullmatch(r"\d{4}-\d{2}-\d{2}", f):
+            perfil["en_analisis_desde"] = f
+    if body.get("plataforma") in PLATAFORMAS:
+        perfil["plataforma"] = body["plataforma"]
+    if "usuario" in body and body.get("usuario") is not None and "id" in perfil:
+        perfil["usuario"] = limpiar_usuario(body.get("usuario")) or perfil.get("usuario", "")
     if body.get("modo") in ("auto", "manual"):
         perfil["modo"] = body["modo"]
     if isinstance(body.get("manual"), dict):
@@ -872,6 +887,8 @@ def resumen_perfil(p):
         "foto": d.get("foto") or "", "pais": p.get("pais") or "", "marcas": p.get("marcas") or [],
         "nicho": p.get("nicho") or "", "estado": p.get("estado") or "Candidato",
         "etiquetas": p.get("etiquetas") or [],
+        "plataforma": p.get("plataforma") or "instagram",
+        "en_analisis_desde": p.get("en_analisis_desde") or (p.get("creado") or "")[:10],
         "seguidores": m.get("seguidores"), "er": m.get("er"), "nivel_cuenta": m.get("nivel_cuenta"),
         "score": s.get("total"), "nivel": s.get("nivel"),
         "recomendacion": (p.get("ia") or {}).get("recomendacion"),
@@ -938,7 +955,7 @@ def actualizar_posts_campana(c, perfiles):
     for part in c.get("participantes") or []:
         perfil = perfiles.get(part["perfil_id"])
         pendientes = {shortcode(p["enlace"]): p for p in part.get("posts") or [] if shortcode(p["enlace"])}
-        if not perfil or not pendientes or perfil.get("modo") == "manual":
+        if not perfil or not pendientes or perfil.get("modo") == "manual" or not perfil.get("usuario"):
             continue  # las cuentas personales se cargan a mano
         try:
             ig = consultar_instagram(perfil["usuario"], paginas=3)
@@ -977,7 +994,7 @@ def reporte_campana(c, perfiles):
         base_cpm = suma["impresiones"] if hay["impresiones"] else suma["alcance"] if hay["alcance"] else suma["vistas"]
         er_campana = round((suma["likes"] + suma["comentarios"]) / n / seg * 100, 2) if n and seg else None
         filas.append({
-            "perfil_id": part["perfil_id"], "usuario": p.get("usuario", "?"),
+            "perfil_id": part["perfil_id"], "usuario": p.get("usuario") or p.get("nombre_contacto") or "?",
             "nombre": (p.get("datos") or {}).get("nombre") or "", "seguidores": seg,
             "costo": costo, "posts": n, "interacciones": inter,
             **{k: (suma[k] if hay[k] else None) for k in METRICAS_POST},
@@ -1114,29 +1131,78 @@ def api_perfiles():
     return jsonify({"perfiles": lista})
 
 
+def _clave_duplicado(p):
+    """Usuario si lo tiene; si no, el nombre normalizado."""
+    if p.get("usuario"):
+        return "u:" + p["usuario"]
+    return "n:" + re.sub(r"\s+", " ", (p.get("nombre_contacto") or "").strip().lower())
+
+
+def _nuevo_perfil(body):
+    """Arma un perfil desde el cuerpo de la petición. Devuelve (perfil, error)."""
+    usuario = limpiar_usuario(body.get("usuario"))
+    nombre = _texto(body.get("nombre_contacto"), 120)
+    if not usuario and _texto(body.get("usuario")) and not nombre:
+        return None, "Escribe un usuario válido (letras, números, punto o guion bajo)."
+    if not usuario and not nombre:
+        return None, "Escribe el usuario de Instagram o, si no lo tienes todavía, el nombre del perfil."
+    perfil = {"id": _id(), "usuario": usuario, "plataforma": "instagram", "estado": "Candidato",
+              "marcas": [], "creado": _ahora(), "historial": [], "modo": "auto",
+              "en_analisis_desde": _hoy()}
+    _aplicar_campos(perfil, body)
+    return perfil, None
+
+
 @creators_bp.route("/api/creators/perfiles", methods=["POST"])
 def api_crear():
     body = _body()
-    usuario = limpiar_usuario(body.get("usuario"))
-    if not usuario:
-        return _error("Escribe un usuario de Instagram válido (letras, números, punto o guion bajo).")
-    existente = next((p for p in _leer()["perfiles"].values() if p["usuario"] == usuario), None)
+    perfil, error = _nuevo_perfil(body)
+    if error:
+        return _error(error)
+    clave = _clave_duplicado(perfil)
+    nombre = f"@{perfil['usuario']}" if perfil["usuario"] else perfil.get("nombre_contacto")
+    existente = next((p for p in _leer()["perfiles"].values() if _clave_duplicado(p) == clave), None)
     if existente:
-        return jsonify({"error": f"@{usuario} ya está registrado.", "id": existente["id"]}), 409
-
-    perfil = {"id": _id(), "usuario": usuario, "plataforma": "instagram", "estado": "Candidato",
-              "marcas": [], "creado": _ahora(), "historial": [], "modo": "auto"}
-    _aplicar_campos(perfil, body)
+        return jsonify({"error": f"{nombre} ya está registrado.", "id": existente["id"]}), 409
     analizar(perfil, con_ia=bool(body.get("con_ia", True)))  # fuera del lock: tarda
 
     def guardar(datos):
-        if any(p["usuario"] == usuario for p in datos["perfiles"].values()):
+        if any(_clave_duplicado(p) == clave for p in datos["perfiles"].values()):
             return False
         datos["perfiles"][perfil["id"]] = perfil
         return True
     if not _modificar(guardar):
-        return _error(f"@{usuario} se registró mientras tanto desde otra pestaña.", 409)
+        return _error(f"{nombre} se registró mientras tanto desde otra pestaña.", 409)
     return jsonify({"perfil": perfil})
+
+
+@creators_bp.route("/api/creators/importar", methods=["POST"])
+def api_importar():
+    """Carga varios perfiles de una vez (por ejemplo, desde listas en Excel o PDF).
+    No consulta Instagram ni la IA: quedan registrados para analizarlos después.
+    Los que ya existen (mismo usuario, o mismo nombre si no tienen usuario) se saltan."""
+    lista = (_body().get("perfiles") or [])[:500]
+    nuevos, saltados, errores = [], [], []
+    for body in lista:
+        perfil, error = _nuevo_perfil(body)
+        if error:
+            errores.append({"perfil": body.get("usuario") or body.get("nombre_contacto"), "error": error})
+            continue
+        analizar(perfil, con_ia=False)
+        perfil["errores"] = [e for e in perfil.get("errores") or [] if not e.startswith("Faltan datos")]
+        nuevos.append(perfil)
+
+    def guardar(datos):
+        claves = {_clave_duplicado(p) for p in datos["perfiles"].values()}
+        for p in nuevos:
+            k = _clave_duplicado(p)
+            if k in claves:
+                saltados.append(p.get("usuario") or p.get("nombre_contacto"))
+                continue
+            claves.add(k)
+            datos["perfiles"][p["id"]] = p
+    _modificar(guardar)
+    return jsonify({"creados": len(nuevos) - len(saltados), "saltados": saltados, "errores": errores})
 
 
 @creators_bp.route("/api/creators/perfiles/<pid>")
@@ -1158,6 +1224,12 @@ def api_perfil(pid):
 @creators_bp.route("/api/creators/perfiles/<pid>", methods=["PATCH"])
 def api_editar(pid):
     body = _body()
+
+    nuevo_usuario = limpiar_usuario(body.get("usuario")) if body.get("usuario") else ""
+    if nuevo_usuario:
+        otro = next((p for p in _leer()["perfiles"].values() if p.get("usuario") == nuevo_usuario and p["id"] != pid), None)
+        if otro:
+            return jsonify({"error": f"@{nuevo_usuario} ya está registrado en otro perfil.", "id": otro["id"]}), 409
 
     def editar(datos):
         p = datos["perfiles"].get(pid)
@@ -1238,16 +1310,16 @@ def api_exportar():
     w = csv.writer(salida)
     w.writerow(["Usuario", "Enlace", "Nombre", "País", "Ciudad", "Marcas", "Nicho", "Estado", "Seguidores",
                 "Nivel cuenta", "Engagement %", "Score", "Nivel", "Recomendación IA", "Email", "Teléfono",
-                "Tarifa", "TikTok", "Etiquetas", "Analizado"])
+                "Tarifa", "TikTok", "Etiquetas", "En análisis desde", "Origen", "Analizado"])
     for p in _leer()["perfiles"].values():
         r, m = resumen_perfil(p), p.get("metricas") or {}
-        w.writerow([f"@{p['usuario']}", f"https://instagram.com/{p['usuario']}", r["nombre"], p.get("pais", ""),
+        w.writerow([f"@{p['usuario']}" if p.get("usuario") else "", f"https://instagram.com/{p['usuario']}" if p.get("usuario") else "", r["nombre"], p.get("pais", ""),
                     p.get("ciudad", ""), ", ".join(r["marcas"]), p.get("nicho", ""), r["estado"],
                     m.get("seguidores") or "", m.get("nivel_cuenta") or "",
                     str(m.get("er") or "").replace(".", ","), r["score"] if r["score"] is not None else "",
                     r["nivel"] or "", r["recomendacion"] or "", p.get("email", ""), p.get("telefono", ""),
                     p.get("tarifa", ""), p.get("tiktok", ""), ", ".join(r["etiquetas"]),
-                    (r["actualizado"] or "")[:10]])
+                    r["en_analisis_desde"], p.get("origen", ""), (r["actualizado"] or "")[:10]])
     # BOM para que Excel abra bien los acentos.
     return Response("\ufeff" + salida.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=creators-piazza-{_hoy()}.csv"})

@@ -62,23 +62,25 @@ function kpi(valor, etiqueta, ref) {
 function pintar(datos) {
   P = datos.perfil;
   const d = P.datos || {}, m = P.metricas || {}, s = P.score || {}, ia = P.ia;
-  document.title = "@" + P.usuario + " — Creators Piazza";
+  const titulo = P.usuario ? "@" + P.usuario : (P.nombre_contacto || "Perfil");
+  document.title = titulo + " — Creators Piazza";
 
   const av = [];
   (P.errores || []).forEach((e) => av.push(`<div class="cr-aviso error">${CR.esc(e)}</div>`));
   document.getElementById("f-avisos").innerHTML = av.join("");
 
   document.getElementById("f-id").innerHTML = `
-    ${CR.avatar(d.foto, P.usuario, true)}
+    ${CR.avatar(d.foto, P.usuario || P.nombre_contacto, true)}
     <div>
-      <h1><a href="https://instagram.com/${CR.esc(P.usuario)}" target="_blank" rel="noopener">@${CR.esc(P.usuario)} ↗</a></h1>
+      <h1>${P.usuario ? `<a href="https://instagram.com/${CR.esc(P.usuario)}" target="_blank" rel="noopener">@${CR.esc(P.usuario)} ↗</a>` : CR.esc(titulo) + ' <span class="cr-chip">sin usuario</span>'}</h1>
       <div class="meta">${CR.esc(d.nombre || P.nombre_contacto || "")}${P.pais ? " · " + CR.esc(P.pais) : ""}${P.ciudad ? ", " + CR.esc(P.ciudad) : ""}
         · ${CR.esc(P.estado || "Candidato")}${P.tiktok ? " · TikTok " + CR.esc(P.tiktok) : ""}</div>
       ${d.biografia ? `<div class="bio">${CR.esc(d.biografia)}</div>` : ""}
       ${d.web ? `<div class="meta"><a href="${CR.esc(d.web)}" target="_blank" rel="noopener">${CR.esc(d.web)}</a></div>` : ""}
       <div style="margin-top:8px">${CR.chips(P.marcas)}${CR.chips((ia && ia.nichos) || [])}${CR.chips(P.etiquetas)}</div>
       ${P.email || P.telefono || P.tarifa ? `<div class="meta" style="margin-top:8px">${[P.email, P.telefono, P.tarifa && "Tarifa: " + P.tarifa].filter(Boolean).map(CR.esc).join(" · ")}</div>` : ""}
-      <div class="cr-mini" style="margin-top:8px">Analizado ${CR.fecha(P.analizado)} · datos ${P.fuente === "meta" ? "de Instagram" : "cargados a mano"}</div>
+      <div class="cr-mini" style="margin-top:8px">En análisis desde <b>${CR.fecha(P.en_analisis_desde || (P.creado || "").slice(0, 10))}</b>${P.origen ? " · Origen: " + CR.esc(P.origen) : ""}${P.plataforma === "tiktok" ? " · Red principal: TikTok" : ""}
+        · Analizado ${CR.fecha(P.analizado)} · datos ${P.fuente === "meta" ? "de Instagram" : "cargados a mano"}</div>
     </div>`;
 
   const barras = [["Engagement", s.engagement], ["Autenticidad", s.autenticidad], ["Afinidad", s.afinidad], ["Actividad", s.actividad]]
@@ -204,7 +206,7 @@ document.getElementById("f-guardar-ia").addEventListener("click", async () => {
 document.getElementById("f-guardar").addEventListener("click", () => guardar(false));
 document.getElementById("f-reanalizar").addEventListener("click", () => guardar(true));
 document.getElementById("f-borrar").addEventListener("click", async () => {
-  if (!P || !confirm(`¿Eliminar @${P.usuario} de la base? También se quita de las campañas. No se puede deshacer.`)) return;
+  if (!P || !confirm(`¿Eliminar ${P.usuario ? "@" + P.usuario : P.nombre_contacto} de la base? También se quita de las campañas. No se puede deshacer.`)) return;
   try { await CR.api("/api/creators/perfiles/" + PID, { method: "DELETE" }); location.href = "/creators"; }
   catch (e) { alert(e.message); }
 });

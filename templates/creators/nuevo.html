@@ -7,11 +7,6 @@
 
 <div class="card">
   <div id="n-error"></div>
-  <div class="campo">
-    <label for="n-usuario">Usuario de Instagram</label>
-    <input id="n-usuario" maxlength="200" placeholder="@usuario o enlace del perfil" autofocus>
-    <div class="hint">{% if meta_ok %}Tiene que ser una cuenta profesional (creador o empresa). Si es personal, marca “Cargar las métricas a mano” abajo.{% else %}Instagram todavía no está conectado: carga las métricas a mano abajo.{% endif %}</div>
-  </div>
   {% include "creators/_campos.html" %}
 
   <div class="cr-acciones" style="margin-top:18px">
@@ -23,6 +18,7 @@
 
 {% block scripts %}
 <script>
+document.getElementById("c-en_analisis_desde").value = new Date().toLocaleDateString("en-CA");
 {% if not meta_ok %}
 document.getElementById("c-modo-manual").checked = true;
 document.getElementById("c-det-extra").open = true;
@@ -30,10 +26,10 @@ document.getElementById("c-det-extra").open = true;
 document.getElementById("n-guardar").addEventListener("click", async () => {
   const caja = document.getElementById("n-error");
   caja.innerHTML = "";
-  const body = { usuario: document.getElementById("n-usuario").value, ...leerCampos() };
+  const body = leerCampos();
   const ia = document.getElementById("n-ia");
   body.con_ia = ia ? ia.checked : false;
-  if (!body.usuario.trim()) { caja.innerHTML = '<div class="cr-aviso error">Escribe el usuario de Instagram.</div>'; return; }
+  if (!body.usuario.trim() && !body.nombre_contacto.trim()) { caja.innerHTML = '<div class="cr-aviso error">Escribe el usuario de Instagram o, al menos, el nombre.</div>'; return; }
   CR.cargando(true, "Consultando Instagram y analizando el perfil… puede tardar hasta un minuto.");
   try {
     const r = await CR.api("/api/creators/perfiles", { method: "POST", body });

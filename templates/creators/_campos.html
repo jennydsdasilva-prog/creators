@@ -1,5 +1,16 @@
 {# Campos editables de un perfil. Los usa el registro y la ficha. #}
 <datalist id="lista-paises">{% for p in paises %}<option value="{{ p }}">{% endfor %}</datalist>
+<div class="cr-grid-3">
+  <div class="campo"><label for="c-usuario">Usuario de Instagram</label>
+    <input id="c-usuario" maxlength="200" placeholder="@usuario o enlace del perfil">
+    <div class="hint">Si todavía no lo tienes, deja el nombre abajo y complétalo después.</div></div>
+  <div class="campo"><label for="c-nombre_contacto">Nombre</label><input id="c-nombre_contacto" maxlength="120" placeholder="Persona o agencia"></div>
+  <div class="campo"><label for="c-plataforma">Red principal</label>
+    <select id="c-plataforma"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="otra">Otra</option></select></div>
+  <div class="campo"><label for="c-en_analisis_desde">En análisis desde</label><input id="c-en_analisis_desde" type="date">
+    <div class="hint">Desde cuándo lo estamos considerando.</div></div>
+  <div class="campo"><label for="c-origen">Origen</label><input id="c-origen" maxlength="80" placeholder="Conocido, agencia, Instagram…"></div>
+</div>
 <div class="campo">
   <label>Marcas para las que se evalúa</label>
   <div class="cr-checks" id="c-marcas">
@@ -29,7 +40,6 @@
 </div>
 <div class="seccion-titulo">Contacto y condiciones</div>
 <div class="cr-grid-3">
-  <div class="campo"><label for="c-nombre_contacto">Nombre de contacto</label><input id="c-nombre_contacto" maxlength="120" placeholder="Persona o agencia"></div>
   <div class="campo"><label for="c-email">Email</label><input id="c-email" type="email" maxlength="160"></div>
   <div class="campo"><label for="c-telefono">Teléfono / WhatsApp</label><input id="c-telefono" maxlength="60"></div>
   <div class="campo"><label for="c-tarifa">Tarifa referencial</label><input id="c-tarifa" maxlength="120" placeholder="Ej: USD 300 por reel"></div>
@@ -59,7 +69,7 @@
 </details>
 
 <script>
-const CAMPOS_TEXTO = ["afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
+const CAMPOS_TEXTO = ["usuario", "plataforma", "en_analisis_desde", "origen", "afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
 const CAMPOS_MANUAL = ["seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post"];
 function leerCampos() {
   const b = {};

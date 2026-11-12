@@ -9,8 +9,9 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --azul: #1a3a5c;
-      --azul-claro: #2563a8;
+      --azul: #7485ad;       /* color de Creators Piazza (el Photo Tool usa #1a3a5c) */
+      --azul-claro: #7485ad;
+      --azul-hover: #5d6e99;
       --rojo: #dc2626;
       --gris-fondo: #f1f5f9;
       --gris-borde: #e2e8f0;
@@ -83,7 +84,7 @@
       font-weight: 600;
       cursor: pointer;
     }
-    button:hover { background: var(--azul-claro); }
+    button:hover { background: var(--azul-hover); }
     .error {
       background: #fef2f2;
       color: var(--rojo);
