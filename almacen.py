@@ -7,7 +7,9 @@ por defecto /creators-piazza). Sin credenciales de Dropbox (desarrollo local)
 se usa un archivo al lado del código.
 
 Variables de entorno:
-  DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN   (recomendado)
+  DROPBOX_APP_KEY + DROPBOX_REFRESH_TOKEN                      (recomendado)
+  DROPBOX_APP_SECRET                                           (solo si el token
+                                   se sacó con el flujo clásico; con PKCE no hace falta)
   DROPBOX_TOKEN                                                (alternativa, vence)
   CREATORS_DROPBOX_DIR                                         (opcional)
 """
@@ -28,16 +30,16 @@ def _dbx():
     key = os.environ.get("DROPBOX_APP_KEY", "")
     secret = os.environ.get("DROPBOX_APP_SECRET", "")
     token = os.environ.get("DROPBOX_TOKEN", "")
-    if refresh and key and secret:
-        _cliente["dbx"] = dropbox.Dropbox(oauth2_refresh_token=refresh, app_key=key, app_secret=secret)
+    if refresh and key:
+        _cliente["dbx"] = dropbox.Dropbox(oauth2_refresh_token=refresh, app_key=key, app_secret=secret or None)
     elif token:
         _cliente["dbx"] = dropbox.Dropbox(oauth2_access_token=token)
     return _cliente["dbx"]
 
 
 def hay_dropbox():
-    return bool((os.environ.get("DROPBOX_REFRESH_TOKEN") and os.environ.get("DROPBOX_APP_KEY")
-                 and os.environ.get("DROPBOX_APP_SECRET")) or os.environ.get("DROPBOX_TOKEN"))
+    return bool((os.environ.get("DROPBOX_REFRESH_TOKEN") and os.environ.get("DROPBOX_APP_KEY"))
+                or os.environ.get("DROPBOX_TOKEN"))
 
 
 def leer(nombre):

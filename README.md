@@ -24,7 +24,7 @@ Los datos se guardan en Dropbox: `/creators-piazza/datos.json`, con una copia di
 | Variable | Para qué |
 |---|---|
 | `CREATORS_PASSWORD` | Contraseña de acceso del equipo (obligatoria) |
-| `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN` | Dropbox de Piazza, donde se guardan los datos (obligatorias) |
+| `DROPBOX_APP_KEY`, `DROPBOX_REFRESH_TOKEN` | App de Dropbox "Creators Piazza Intl" (carpeta propia), donde se guardan los datos (obligatorias). `DROPBOX_APP_SECRET` solo si el token no se sacó con PKCE |
 | `CREATORS_DROPBOX_DIR` | Carpeta en Dropbox (default `/creators-piazza`) |
 | `META_ACCESS_TOKEN` | Token de Meta para consultar Instagram |
 | `META_IG_USER_ID` | Número de id de la cuenta de Instagram profesional desde la que se consulta |
