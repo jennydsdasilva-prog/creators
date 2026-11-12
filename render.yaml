@@ -1,0 +1,32 @@
+# Despliegue de Creators Piazza en Render (Blueprint).
+# Las variables marcadas sync: false se cargan a mano en el panel de Render.
+# El disco de Render se borra en cada deploy: los datos viven en Dropbox.
+services:
+  - type: web
+    name: creators-piazza
+    runtime: python
+    plan: free            # "starter" ($7/mes) para que no se duerma
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300
+    healthCheckPath: /api/salud
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: CREATORS_PASSWORD
+        sync: false
+      - key: DROPBOX_APP_KEY
+        sync: false
+      - key: DROPBOX_APP_SECRET
+        sync: false
+      - key: DROPBOX_REFRESH_TOKEN
+        sync: false
+      - key: CREATORS_DROPBOX_DIR
+        value: /creators-piazza
+      - key: META_ACCESS_TOKEN
+        sync: false
+      - key: META_IG_USER_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Campaña — Creators Piazza{% endblock %}
+{% block body %}
+{% include "creators/_comun.html" %}
+<div class="cr-cabecera">
+  <h1 id="k-titulo">Campaña<small id="k-sub"></small></h1>
+  <a class="btn btn-gris btn-sm" id="k-reporte" href="#">Ver reporte</a>
+</div>
+<div id="k-avisos"></div>
+
+<div class="card">
+  <h2>Datos de la campaña</h2>
+  <div class="cr-grid-3">
+    <div class="campo"><label for="k-nombre">Nombre</label><input id="k-nombre" maxlength="120"></div>
+    <div class="campo"><label for="k-marca">Marca</label><select id="k-marca"><option value=""></option>{% for m in marcas %}<option>{{ m }}</option>{% endfor %}</select></div>
+    <div class="campo"><label for="k-estado">Estado</label><select id="k-estado">{% for e in estados_campana %}<option>{{ e }}</option>{% endfor %}</select></div>
+    <div class="campo"><label for="k-pais">País</label><input id="k-pais" list="paises-k" maxlength="60"></div>
+    <div class="campo"><label for="k-inicio">Inicio</label><input id="k-inicio" type="date"></div>
+    <div class="campo"><label for="k-fin">Fin</label><input id="k-fin" type="date"></div>
+    <div class="campo"><label for="k-presupuesto">Presupuesto</label><input id="k-presupuesto" inputmode="decimal"></div>
+    <div class="campo"><label for="k-moneda">Moneda</label><select id="k-moneda"><option>USD</option><option>EUR</option><option>CRC</option><option>GTQ</option><option>HNL</option><option>NIO</option><option>DOP</option><option>COP</option><option>MXN</option><option>PEN</option></select></div>
+  </div>
+  <datalist id="paises-k">{% for p in paises %}<option value="{{ p }}">{% endfor %}</datalist>
+  <div class="campo"><label for="k-objetivo">Objetivo</label><input id="k-objetivo" maxlength="600"></div>
+  <div class="campo"><label for="k-notas">Notas</label><textarea id="k-notas" rows="2" maxlength="4000"></textarea></div>
+</div>
+
+<div class="card">
+  <h2>Influencers</h2>
+  <p class="cr-mini" style="margin-bottom:12px">Pega el enlace de cada publicación de la campaña. <b>Likes, comentarios y vistas</b> se traen de Instagram con
+    “Actualizar desde Instagram”. <b>Alcance, impresiones, clics, guardados, compartidos y ventas</b> son privados: cárgalos con las capturas que mande el influencer.</p>
+  <div id="k-participantes"></div>
+  <div class="cr-acciones" style="margin-top:6px">
+    <select id="k-agregar" style="padding:8px 10px;border:1px solid var(--gris-borde);border-radius:8px;min-width:260px"><option value="">+ Agregar influencer de la base…</option></select>
+    <a class="cr-mini" href="/creators/nuevo">¿No está? Regístralo primero</a>
+  </div>
+</div>
+
+<div class="card no-imprimir" style="position:sticky;bottom:10px;z-index:5">
+  <div class="cr-acciones">
+    <button class="btn btn-primario" id="k-guardar">Guardar</button>
+    <button class="btn btn-verde" id="k-actualizar" {% if not meta_ok %}disabled title="Instagram no está conectado"{% endif %}>Actualizar desde Instagram</button>
+    <span id="k-ok" class="cr-mini"></span>
+    <button class="btn btn-rojo btn-sm" id="k-borrar" style="margin-left:auto">Eliminar campaña</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CID = {{ cid|tojson }};
+const METRICAS = [["likes", "Likes"], ["comentarios", "Coment."], ["vistas", "Vistas"], ["alcance", "Alcance"], ["impresiones", "Impres."],
+  ["clics", "Clics"], ["guardados", "Guard."], ["compartidos", "Compart."], ["ventas", "Ventas"]];
+let C = null, PERFILES = {}, TODOS = [], CAMBIOS = false;
+
+function campos() { return ["nombre", "marca", "estado", "pais", "inicio", "fin", "presupuesto", "moneda", "objetivo", "notas"]; }
+
+function pintarParticipantes() {
+  const cont = document.getElementById("k-participantes");
+  const parts = C.participantes || [];
+  if (!parts.length) { cont.innerHTML = '<div class="cr-vacio">Todavía no hay influencers en esta campaña.</div>'; }
+  else cont.innerHTML = parts.map((x, i) => {
+    const p = PERFILES[x.perfil_id] || { usuario: "?" };
+    const filas = (x.posts || []).map((post, j) => `<tr style="cursor:default">
+      <td><input class="cr-input-link" data-i="${i}" data-j="${j}" data-k="enlace" value="${CR.esc(post.enlace)}">
+        <div class="cr-mini">${post.fuente === "meta" ? "Instagram " + CR.fecha(post.actualizado) : "manual"}${post.tipo ? " · " + CR.esc(post.tipo) : ""}</div></td>
+      ${METRICAS.map(([k]) => `<td><input class="cr-input-mini" data-i="${i}" data-j="${j}" data-k="${k}" inputmode="numeric" value="${post[k] ?? ""}"></td>`).join("")}
+      <td><button class="cr-x" title="Quitar" onclick="quitarPost(${i},${j})">✕</button></td></tr>`).join("");
+    return `<div class="cr-part">
+      <div class="cr-part-top">
+        <a class="cr-persona" href="/creators/p/${x.perfil_id}" style="text-decoration:none;color:inherit">${CR.avatar(p.foto, p.usuario)}
+          <div><b>@${CR.esc(p.usuario)}</b><span>${CR.corto(p.seguidores)} seguidores · ER ${CR.pct(p.er)}</span></div></a>
+        <div class="campo"><label>Costo</label><input class="cr-input-mini" data-i="${i}" data-k="costo" inputmode="decimal" value="${x.costo ?? ""}"></div>
+        <div class="campo" style="flex:1;min-width:200px"><label>Entregables</label><input data-i="${i}" data-k="entregables" maxlength="300" value="${CR.esc(x.entregables)}" placeholder="Ej: 2 reels + 3 historias"></div>
+        <div class="campo"><label>Código de descuento</label><input data-i="${i}" data-k="codigo" maxlength="60" value="${CR.esc(x.codigo)}" style="width:150px"></div>
+        <button class="cr-x" title="Quitar de la campaña" onclick="quitarParticipante(${i})">✕</button>
+      </div>
+      <div class="cr-tabla"><table style="min-width:1050px"><thead><tr><th>Publicación</th>${METRICAS.map(([, n]) => `<th>${n}</th>`).join("")}<th></th></tr></thead>
+        <tbody>${filas || `<tr><td colspan="${METRICAS.length + 2}" class="cr-mini">Sin publicaciones cargadas.</td></tr>`}</tbody></table></div>
+      <button class="btn btn-gris btn-sm" style="margin-top:8px" onclick="agregarPost(${i})">+ Agregar publicación</button>
+    </div>`;
+  }).join("");
+  cont.querySelectorAll("input").forEach((el) => el.addEventListener("input", () => {
+    const i = +el.dataset.i, k = el.dataset.k;
+    if (el.dataset.j !== undefined) C.participantes[i].posts[+el.dataset.j][k] = el.value;
+    else C.participantes[i][k] = el.value;
+    CAMBIOS = true;
+  }));
+  const usados = new Set(parts.map((x) => x.perfil_id));
+  document.getElementById("k-agregar").innerHTML = '<option value="">+ Agregar influencer de la base…</option>' +
+    TODOS.filter((p) => !usados.has(p.id)).map((p) => `<option value="${p.id}">@${CR.esc(p.usuario)}${p.nombre ? " — " + CR.esc(p.nombre) : ""}</option>`).join("");
+}
+
+function pintar(datos) {
+  C = datos.campana; PERFILES = datos.perfiles || {};
+  document.getElementById("k-titulo").innerHTML = CR.esc(C.nombre) + `<small>${CR.esc(C.marca || "")} · ${CR.esc(C.estado)}</small>`;
+  document.getElementById("k-reporte").href = `/creators/campanas/${CID}/reporte`;
+  campos().forEach((c) => (document.getElementById("k-" + c).value = C[c] ?? (c === "moneda" ? "USD" : "")));
+  pintarParticipantes();
+  CAMBIOS = false;
+}
+
+function cuerpo() {
+  const b = {};
+  campos().forEach((c) => (b[c] = document.getElementById("k-" + c).value));
+  b.participantes = C.participantes;
+  return b;
+}
+
+function agregarPost(i) { C.participantes[i].posts.push({ enlace: "", fuente: "manual" }); CAMBIOS = true; pintarParticipantes(); }
+function quitarPost(i, j) { C.participantes[i].posts.splice(j, 1); CAMBIOS = true; pintarParticipantes(); }
+function quitarParticipante(i) {
+  const p = PERFILES[C.participantes[i].perfil_id] || {};
+  if (!confirm(`¿Quitar a @${p.usuario || "?"} de la campaña?`)) return;
+  C.participantes.splice(i, 1); CAMBIOS = true; pintarParticipantes();
+}
+
+document.getElementById("k-agregar").addEventListener("change", (e) => {
+  const id = e.target.value; if (!id) return;
+  const p = TODOS.find((x) => x.id === id);
+  PERFILES[id] = p;
+  C.participantes.push({ perfil_id: id, costo: "", entregables: "", codigo: "", posts: [{ enlace: "", fuente: "manual" }] });
+  CAMBIOS = true; pintarParticipantes();
+});
+document.querySelectorAll(".card input, .card select, .card textarea").forEach((el) => el.addEventListener("input", () => (CAMBIOS = true)));
+
+async function guardar() {
+  const ok = document.getElementById("k-ok");
+  try { pintar(await CR.api("/api/creators/campanas/" + CID, { method: "PATCH", body: cuerpo() })); ok.textContent = "Guardado."; return true; }
+  catch (e) { ok.innerHTML = `<span style="color:var(--rojo)">${CR.esc(e.message)}</span>`; return false; }
+}
+document.getElementById("k-guardar").addEventListener("click", guardar);
+document.getElementById("k-actualizar").addEventListener("click", async () => {
+  if (!(await guardar())) return;
+  CR.cargando(true, "Trayendo de Instagram las métricas de cada publicación…");
+  try {
+    const r = await CR.api(`/api/creators/campanas/${CID}/actualizar`, { method: "POST" });
+    pintar(r);
+    document.getElementById("k-avisos").innerHTML = (r.avisos || []).map((a) => `<div class="cr-aviso">${CR.esc(a)}</div>`).join("");
+    document.getElementById("k-ok").textContent = "Métricas actualizadas.";
+  } catch (e) { document.getElementById("k-ok").innerHTML = `<span style="color:var(--rojo)">${CR.esc(e.message)}</span>`; }
+  finally { CR.cargando(false); }
+});
+document.getElementById("k-reporte").addEventListener("click", async (e) => {
+  if (CAMBIOS) { e.preventDefault(); if (await guardar()) location.href = `/creators/campanas/${CID}/reporte`; }
+});
+document.getElementById("k-borrar").addEventListener("click", async () => {
+  if (!confirm("¿Eliminar esta campaña? Los perfiles quedan en la base. No se puede deshacer.")) return;
+  try { await CR.api("/api/creators/campanas/" + CID, { method: "DELETE" }); location.href = "/creators/campanas"; } catch (e) { alert(e.message); }
+});
+window.addEventListener("beforeunload", (e) => { if (CAMBIOS) { e.preventDefault(); e.returnValue = ""; } });
+
+(async () => {
+  try {
+    const [datos, lista] = await Promise.all([CR.api("/api/creators/campanas/" + CID), CR.api("/api/creators/perfiles")]);
+    TODOS = lista.perfiles;
+    pintar(datos);
+  } catch (e) { document.getElementById("k-participantes").innerHTML = `<div class="cr-vacio"><b>${CR.esc(e.message)}</b><a href="/creators/campanas">Volver</a></div>`; }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar — Creators Piazza</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icono.png') }}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --azul: #1a3a5c;
+      --azul-claro: #2563a8;
+      --rojo: #dc2626;
+      --gris-fondo: #f1f5f9;
+      --gris-borde: #e2e8f0;
+      --texto: #1e293b;
+      --texto-suave: #64748b;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--gris-fondo);
+      color: var(--texto);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .caja {
+      background: white;
+      border: 1px solid var(--gris-borde);
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    /* El logo es blanco, así que sobre la tarjeta blanca no se leería.
+       Va dentro de un bloque azul, que además le da presencia a la portada. */
+    .logo {
+      background: var(--azul);
+      border-radius: 10px;
+      padding: 16px 22px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: center;
+    }
+    .logo .marca { color: white; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+    .logo .marca span { color: #93c5fd; }
+    .sub {
+      text-align: center;
+      color: var(--texto-suave);
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    input[type=password] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--gris-borde);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+    }
+    input[type=password]:focus {
+      outline: 2px solid var(--azul-claro);
+      outline-offset: -1px;
+    }
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 11px;
+      background: var(--azul);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: var(--azul-claro); }
+    .error {
+      background: #fef2f2;
+      color: var(--rojo);
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <form class="caja" method="post" action="{{ url_for('login') }}">
+    <div class="logo">
+      <span class="marca">PIAZZA <span>Creators</span></span>
+    </div>
+    <div class="sub">Base de influencers de Piazza · acceso del equipo</div>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <label for="password">Contraseña</label>
+    <input type="password" id="password" name="password" autofocus required
+           autocomplete="current-password">
+    <input type="hidden" name="siguiente" value="{{ siguiente }}">
+
+    <button type="submit">Entrar</button>
+  </form>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Creators Piazza{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icono.png') }}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --azul: #1a3a5c;
+      --azul-claro: #2563a8;
+      --verde: #16a34a;
+      --rojo: #dc2626;
+      --amarillo: #d97706;
+      --gris-fondo: #f1f5f9;
+      --gris-borde: #e2e8f0;
+      --texto: #1e293b;
+      --texto-suave: #64748b;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--gris-fondo);
+      color: var(--texto);
+      min-height: 100vh;
+    }
+
+    /* Navbar */
+    nav {
+      background: var(--azul);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      height: 56px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    nav .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: 1px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    nav .logo span { color: #93c5fd; }
+
+    /* En pantallas chicas el logo y el menú se aprietan; a 430px el menú se
+       desliza de lado para que "Salir" no quede afuera. */
+    @media (max-width: 700px) {
+      nav { padding: 0 14px; }
+      nav .logo { font-size: 17px; }
+      nav .nav-links a { padding: 5px 9px; font-size: 13px; }
+    }
+    @media (max-width: 430px) {
+      nav .logo { font-size: 15px; }
+      nav .nav-links { gap: 0; overflow-x: auto; scrollbar-width: none; }
+      nav .nav-links a { white-space: nowrap; }
+      nav .nav-links a { padding: 5px 7px; font-size: 12px; }
+    }
+    nav .nav-links {
+      margin-left: auto;
+      display: flex;
+      gap: 4px;
+    }
+    nav .nav-links a {
+      color: #cbd5e1;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: background 0.15s, color 0.15s;
+    }
+    nav .nav-links a:hover, nav .nav-links a.activo {
+      background: rgba(255,255,255,0.15);
+      color: white;
+    }
+
+    /* Contenido */
+    .contenido {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border: 1px solid var(--gris-borde);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card h2 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--azul);
+    }
+
+    /* Botones */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-primario { background: var(--azul-claro); color: white; }
+    .btn-verde  { background: var(--verde); color: white; }
+    .btn-gris   { background: #e2e8f0; color: var(--texto); }
+    .btn-rojo   { background: var(--rojo); color: white; }
+    .btn-sm     { padding: 6px 13px; font-size: 13px; }
+
+    /* Badges de estado */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-ok     { background: #dcfce7; color: #166534; }
+    .badge-error  { background: #fee2e2; color: #991b1b; }
+    .badge-warn   { background: #fef9c3; color: #854d0e; }
+    .badge-info   { background: #dbeafe; color: #1e40af; }
+
+    /* Formularios */
+    .campo { margin-bottom: 18px; }
+    .campo label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: var(--texto);
+    }
+    .campo .hint {
+      font-size: 12px;
+      color: var(--texto-suave);
+      margin-top: 3px;
+    }
+    .campo input, .campo select, .campo textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--gris-borde);
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--texto);
+      background: white;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .campo input:focus, .campo select:focus {
+      outline: none;
+      border-color: var(--azul-claro);
+      box-shadow: 0 0 0 3px rgba(37,99,168,0.12);
+    }
+    .campo input[type="file"] { padding: 6px; }
+    /* Las casillas no se estiran: con width:100% ocupaban todo el renglón y el
+       nombre del cliente quedaba aplastado contra el borde, una letra por línea. */
+    .campo input[type="checkbox"], .campo input[type="radio"] {
+      width: auto; padding: 0; flex: none; margin: 0;
+    }
+
+    /* Grid 2 col */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* Separador de sección */
+    .seccion-titulo {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--texto-suave);
+      border-bottom: 1px solid var(--gris-borde);
+      padding-bottom: 8px;
+      margin: 24px 0 16px;
+    }
+
+    /* Log de proceso */
+    #log-box {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 16px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13px;
+      height: 340px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+    #log-box .linea-info    { color: #94a3b8; }
+    #log-box .linea-ok      { color: #4ade80; }
+    #log-box .linea-error   { color: #f87171; }
+    #log-box .linea-advertencia { color: #fbbf24; }
+    #log-box .ts { color: #475569; margin-right: 8px; }
+
+    /* Alertas flash */
+    .alerta {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .alerta-ok    { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .alerta-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .alerta-info  { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+
+    /* Tabla */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 10px 12px; background: #f8fafc; color: var(--texto-suave); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid var(--gris-borde); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--gris-borde); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .stat-card { background: white; border: 1px solid var(--gris-borde); border-radius: 10px; padding: 16px; text-align: center; }
+    .stat-card .num { font-size: 36px; font-weight: 700; line-height: 1; }
+    .stat-card .label { font-size: 13px; color: var(--texto-suave); margin-top: 4px; }
+    .stat-ok   .num { color: var(--verde); }
+    .stat-warn .num { color: var(--amarillo); }
+    .stat-err  .num { color: var(--rojo); }
+
+    /* Barra progreso */
+    .progreso-barra-cont {
+      background: #e2e8f0;
+      border-radius: 999px;
+      height: 8px;
+      overflow: hidden;
+      margin: 12px 0 4px;
+    }
+    .progreso-barra {
+      height: 100%;
+      background: var(--azul-claro);
+      border-radius: 999px;
+      transition: width 0.3s;
+    }
+    .progreso-texto { font-size: 13px; color: var(--texto-suave); text-align: right; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* Validación */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--gris-borde);
+      font-size: 14px;
+    }
+    .check-item:last-child { border-bottom: none; }
+    .check-icono { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/creators" class="logo">PIAZZA <span>Creators</span></a>
+    <div class="nav-links">
+      <a href="/creators" {% if request.path == '/creators' or request.path.startswith('/creators/p/') %}class="activo"{% endif %}>Perfiles</a>
+      <a href="/creators/nuevo" {% if request.path == '/creators/nuevo' %}class="activo"{% endif %}>Registrar</a>
+      <a href="/creators/campanas" {% if request.path.startswith('/creators/campanas') %}class="activo"{% endif %}>Campañas</a>
+      {% if session.autenticada %}<a href="/logout">Salir</a>{% endif %}
+    </div>
+  </nav>
+
+  <div class="contenido">
+    {% block body %}{% endblock %}
+  </div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

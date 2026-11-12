@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Campañas — Creators Piazza{% endblock %}
+{% block body %}
+{% include "creators/_comun.html" %}
+<div class="cr-cabecera"><h1>Campañas<small>Influencers por campaña, costos, publicaciones y reportes</small></h1></div>
+
+<div class="card">
+  <div class="cr-tabla"><table>
+    <thead><tr><th>Campaña</th><th>Marca</th><th>País</th><th>Fechas</th><th>Estado</th>
+      <th class="cr-num">Influencers</th><th class="cr-num">Inversión</th><th class="cr-num">Interacciones</th><th class="cr-num">CPE</th></tr></thead>
+    <tbody id="c-filas"><tr><td colspan="9" class="cr-vacio">Cargando…</td></tr></tbody>
+  </table></div>
+</div>
+
+<div class="card">
+  <h2>Nueva campaña</h2>
+  <div id="c-error"></div>
+  <div class="cr-grid-3">
+    <div class="campo"><label for="n-nombre">Nombre</label><input id="n-nombre" maxlength="120" placeholder="Ej: OP Running Club Q1"></div>
+    <div class="campo"><label for="n-marca">Marca</label><select id="n-marca"><option value=""></option>{% for m in marcas %}<option>{{ m }}</option>{% endfor %}</select></div>
+    <div class="campo"><label for="n-pais">País</label><input id="n-pais" list="paises-c" maxlength="60" placeholder="O varios / regional"></div>
+    <div class="campo"><label for="n-inicio">Inicio</label><input id="n-inicio" type="date"></div>
+    <div class="campo"><label for="n-fin">Fin</label><input id="n-fin" type="date"></div>
+    <div class="campo"><label for="n-presupuesto">Presupuesto</label><input id="n-presupuesto" inputmode="decimal"></div>
+  </div>
+  <datalist id="paises-c">{% for p in paises %}<option value="{{ p }}">{% endfor %}</datalist>
+  <div class="campo"><label for="n-objetivo">Objetivo</label><input id="n-objetivo" maxlength="600" placeholder="Ej: dar a conocer la línea de running en Panamá y Costa Rica"></div>
+  <button class="btn btn-primario" id="n-crear">Crear campaña</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function cargar() {
+  const tb = document.getElementById("c-filas");
+  try {
+    const { campanas } = await CR.api("/api/creators/campanas");
+    tb.innerHTML = campanas.length ? campanas.map((c) => `
+      <tr style="cursor:pointer" onclick="location.href='/creators/campanas/${c.id}'">
+        <td><b>${CR.esc(c.nombre)}</b></td><td>${CR.esc(c.marca || "—")}</td><td>${CR.esc(c.pais || "—")}</td>
+        <td class="cr-mini">${CR.fecha(c.inicio)} – ${CR.fecha(c.fin)}</td><td>${CR.esc(c.estado)}</td>
+        <td class="cr-num">${c.influencers}</td><td class="cr-num">${CR.dinero(c.costo, c.moneda)}</td>
+        <td class="cr-num">${CR.num(c.interacciones)}</td><td class="cr-num">${CR.dinero(c.cpe, c.moneda)}</td></tr>`).join("") :
+      '<tr><td colspan="9" class="cr-vacio"><b>No hay campañas todavía</b>Crea la primera abajo.</td></tr>';
+  } catch (e) { tb.innerHTML = `<tr><td colspan="9" class="cr-vacio">${CR.esc(e.message)}</td></tr>`; }
+}
+document.getElementById("n-crear").addEventListener("click", async () => {
+  const v = (id) => document.getElementById("n-" + id).value;
+  try {
+    const r = await CR.api("/api/creators/campanas", { method: "POST", body: {
+      nombre: v("nombre"), marca: v("marca"), pais: v("pais"), inicio: v("inicio"), fin: v("fin"),
+      presupuesto: v("presupuesto"), objetivo: v("objetivo") } });
+    location.href = "/creators/campanas/" + r.campana.id;
+  } catch (e) { document.getElementById("c-error").innerHTML = `<div class="cr-aviso error">${CR.esc(e.message)}</div>`; }
+});
+cargar();
+</script>
+{% endblock %}

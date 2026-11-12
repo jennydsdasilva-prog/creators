@@ -1,0 +1,73 @@
+{# Campos editables de un perfil. Los usa el registro y la ficha. #}
+<datalist id="lista-paises">{% for p in paises %}<option value="{{ p }}">{% endfor %}</datalist>
+<div class="campo">
+  <label>Marcas para las que se evalúa</label>
+  <div class="cr-checks" id="c-marcas">
+    {% for m in marcas %}<label><input type="checkbox" value="{{ m }}"> {{ m }}</label>{% endfor %}
+  </div>
+  <div class="hint">La IA mide la afinidad del perfil con estas marcas. Si no marcas ninguna, se evalúa con todas.</div>
+</div>
+<div class="cr-grid-3">
+  <div class="campo"><label for="c-pais">País</label><input id="c-pais" list="lista-paises" maxlength="60"></div>
+  <div class="campo"><label for="c-ciudad">Ciudad</label><input id="c-ciudad" maxlength="80"></div>
+  <div class="campo"><label for="c-estado">Estado</label>
+    <select id="c-estado">{% for e in estados %}<option>{{ e }}</option>{% endfor %}</select></div>
+  <div class="campo"><label for="c-nicho">Nicho</label><input id="c-nicho" maxlength="120" placeholder="Running, fútbol, moda…"></div>
+  <div class="campo"><label for="c-etiquetas">Etiquetas</label><input id="c-etiquetas" maxlength="200" placeholder="Separadas por coma">
+    <div class="hint">Cortas, de menos de 20 caracteres.</div></div>
+  <div class="campo"><label for="c-tiktok">TikTok</label><input id="c-tiktok" maxlength="80" placeholder="@usuario"></div>
+</div>
+<div class="seccion-titulo">Contacto y condiciones</div>
+<div class="cr-grid-3">
+  <div class="campo"><label for="c-nombre_contacto">Nombre de contacto</label><input id="c-nombre_contacto" maxlength="120" placeholder="Persona o agencia"></div>
+  <div class="campo"><label for="c-email">Email</label><input id="c-email" type="email" maxlength="160"></div>
+  <div class="campo"><label for="c-telefono">Teléfono / WhatsApp</label><input id="c-telefono" maxlength="60"></div>
+  <div class="campo"><label for="c-tarifa">Tarifa referencial</label><input id="c-tarifa" maxlength="120" placeholder="Ej: USD 300 por reel"></div>
+  <div class="campo"><label for="c-responsable">Responsable en Piazza</label><input id="c-responsable" maxlength="80"></div>
+</div>
+<div class="campo"><label for="c-notas">Notas del equipo</label>
+  <textarea id="c-notas" rows="3" maxlength="4000" placeholder="Cómo llegó, con quién habló, qué pidió…"></textarea>
+  <div class="hint">La IA también las lee al analizar.</div></div>
+
+<details class="cr-det" id="c-det-extra">
+  <summary>Comentarios de muestra y datos manuales</summary>
+  <div class="campo" style="margin-top:10px"><label for="c-comentarios_muestra">Comentarios de muestra (opcional)</label>
+    <textarea id="c-comentarios_muestra" rows="4" maxlength="6000" placeholder="Pega 15 o 20 comentarios de sus últimos posts, uno por línea"></textarea>
+    <div class="hint">Instagram no deja leer los comentarios de otras cuentas por la API. Si los pegas, la IA detecta mejor bots y comentarios genéricos.</div></div>
+
+  <div class="cr-checks" style="margin:6px 0 12px"><label><input type="checkbox" id="c-modo-manual"> Cargar las métricas a mano (cuenta personal o sin conexión a Instagram)</label></div>
+  <div class="cr-grid-3" id="c-manual">
+    <div class="campo"><label for="m-seguidores">Seguidores</label><input id="m-seguidores" inputmode="numeric" placeholder="Ej: 25.400 o 25,4k"></div>
+    <div class="campo"><label for="m-seguidos">Seguidos</label><input id="m-seguidos" inputmode="numeric"></div>
+    <div class="campo"><label for="m-likes_prom">Likes promedio por post</label><input id="m-likes_prom" inputmode="numeric"></div>
+    <div class="campo"><label for="m-comentarios_prom">Comentarios promedio</label><input id="m-comentarios_prom" inputmode="numeric"></div>
+    <div class="campo"><label for="m-vistas_prom">Vistas promedio en reels</label><input id="m-vistas_prom" inputmode="numeric"></div>
+    <div class="campo"><label for="m-posts_semana">Posts por semana</label><input id="m-posts_semana" inputmode="decimal"></div>
+    <div class="campo"><label for="m-dias_ultimo_post">Días desde el último post</label><input id="m-dias_ultimo_post" inputmode="numeric"></div>
+  </div>
+  <div class="hint">Usa los últimos 12 posts (sin contar los de las últimas 48 horas) para sacar los promedios.</div>
+</details>
+
+<script>
+const CAMPOS_TEXTO = ["pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
+const CAMPOS_MANUAL = ["seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post"];
+function leerCampos() {
+  const b = {};
+  CAMPOS_TEXTO.forEach((c) => (b[c] = document.getElementById("c-" + c).value));
+  b.marcas = [...document.querySelectorAll("#c-marcas input:checked")].map((x) => x.value);
+  b.modo = document.getElementById("c-modo-manual").checked ? "manual" : "auto";
+  b.manual = {};
+  CAMPOS_MANUAL.forEach((c) => (b.manual[c] = document.getElementById("m-" + c).value));
+  return b;
+}
+function ponerCampos(p) {
+  CAMPOS_TEXTO.forEach((c) => {
+    const v = c === "etiquetas" ? (p.etiquetas || []).join(", ") : p[c];
+    if (v !== undefined && v !== null) document.getElementById("c-" + c).value = v;
+  });
+  document.querySelectorAll("#c-marcas input").forEach((x) => (x.checked = (p.marcas || []).includes(x.value)));
+  document.getElementById("c-modo-manual").checked = p.modo === "manual";
+  CAMPOS_MANUAL.forEach((c) => (document.getElementById("m-" + c).value = (p.manual || {})[c] || ""));
+  if (p.modo === "manual" || p.comentarios_muestra) document.getElementById("c-det-extra").open = true;
+}
+</script>

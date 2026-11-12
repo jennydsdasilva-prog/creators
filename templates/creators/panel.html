@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Creators Piazza{% endblock %}
+{% block body %}
+{% include "creators/_comun.html" %}
+
+<div class="cr-cabecera">
+  <h1>Creators Piazza<small>Base de perfiles de influencers de las marcas de Piazza</small></h1>
+  <a class="btn btn-gris btn-sm" href="/api/creators/exportar.csv">Descargar Excel (CSV)</a>
+  <a class="btn btn-primario" href="/creators/nuevo">+ Registrar perfil</a>
+</div>
+
+<div class="stats-grid" id="cr-stats"></div>
+
+<div class="card">
+  <div class="cr-filtros">
+    <input id="f-texto" type="search" placeholder="Buscar usuario, nombre, nicho o etiqueta…">
+    <select id="f-marca"><option value="">Todas las marcas</option>{% for m in marcas %}<option>{{ m }}</option>{% endfor %}</select>
+    <select id="f-pais"><option value="">Todos los países</option></select>
+    <select id="f-estado"><option value="">Todos los estados</option>{% for e in estados %}<option>{{ e }}</option>{% endfor %}</select>
+    <select id="f-nivel"><option value="">Todos los niveles</option>
+      <option>Recomendado</option><option>Potencial</option><option>Revisar</option><option>No recomendado</option></select>
+  </div>
+  <div class="cr-tabla">
+    <table>
+      <thead><tr>
+        <th data-orden="usuario">Perfil</th><th data-orden="pais">País</th><th>Marcas</th>
+        <th data-orden="seguidores" class="cr-num">Seguidores</th><th data-orden="er" class="cr-num">Engagement</th>
+        <th data-orden="score" class="cr-num">Score</th><th data-orden="estado">Estado</th><th data-orden="actualizado">Analizado</th>
+      </tr></thead>
+      <tbody id="cr-filas"><tr><td colspan="8" class="cr-vacio">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let PERFILES = [], ORDEN = { campo: "score", dir: -1 };
+
+function filtrados() {
+  const t = document.getElementById("f-texto").value.trim().toLowerCase();
+  const marca = document.getElementById("f-marca").value, pais = document.getElementById("f-pais").value;
+  const estado = document.getElementById("f-estado").value, nivel = document.getElementById("f-nivel").value;
+  return PERFILES.filter((p) =>
+    (!t || [p.usuario, p.nombre, p.nicho, ...(p.etiquetas || [])].join(" ").toLowerCase().includes(t)) &&
+    (!marca || p.marcas.includes(marca)) && (!pais || p.pais === pais) &&
+    (!estado || p.estado === estado) && (!nivel || p.nivel === nivel));
+}
+
+function pintar() {
+  const lista = filtrados().sort((a, b) => {
+    const x = a[ORDEN.campo], y = b[ORDEN.campo];
+    if (x === y) return 0;
+    if (x === null || x === undefined || x === "") return 1;
+    if (y === null || y === undefined || y === "") return -1;
+    return (x > y ? 1 : -1) * ORDEN.dir;
+  });
+  const tb = document.getElementById("cr-filas");
+  if (!PERFILES.length) {
+    tb.innerHTML = `<tr><td colspan="8" class="cr-vacio"><b>Todavía no hay perfiles</b>Registra el primero con el botón “Registrar perfil”.</td></tr>`;
+    return;
+  }
+  if (!lista.length) { tb.innerHTML = `<tr><td colspan="8" class="cr-vacio">Ningún perfil coincide con los filtros.</td></tr>`; return; }
+  tb.innerHTML = lista.map((p) => `
+    <tr onclick="location.href='/creators/p/${p.id}'">
+      <td><div class="cr-persona">${CR.avatar(p.foto, p.usuario)}<div><b>@${CR.esc(p.usuario)}</b>
+        <span>${CR.esc(p.nombre)}${p.nicho ? " · " + CR.esc(p.nicho) : ""}</span></div></div></td>
+      <td>${CR.esc(p.pais) || "—"}</td>
+      <td>${CR.chips(p.marcas)}</td>
+      <td class="cr-num">${CR.corto(p.seguidores)}<div class="cr-mini">${CR.esc(p.nivel_cuenta || "")}</div></td>
+      <td class="cr-num">${CR.pct(p.er)}</td>
+      <td class="cr-num">${CR.score(p.score)}${p.alertas_altas ? `<div class="cr-mini" style="color:var(--rojo)">${p.alertas_altas} alerta${p.alertas_altas > 1 ? "s" : ""}</div>` : ""}</td>
+      <td>${CR.esc(p.estado)}${p.campana_activa ? `<div class="cr-mini">En: ${CR.esc(p.campana_activa)}</div>` : ""}</td>
+      <td class="cr-mini">${CR.fecha(p.actualizado)}${p.fuente === "manual" ? "<br>manual" : ""}</td>
+    </tr>`).join("");
+}
+
+function estadisticas() {
+  const n = PERFILES.length;
+  const rec = PERFILES.filter((p) => p.nivel === "Recomendado").length;
+  const act = PERFILES.filter((p) => p.estado === "Activo").length;
+  const ers = PERFILES.map((p) => p.er).filter((x) => x !== null && x !== undefined);
+  const prom = ers.length ? ers.reduce((a, b) => a + b, 0) / ers.length : null;
+  document.getElementById("cr-stats").innerHTML = `
+    <div class="stat-card"><div class="num">${n}</div><div class="label">Perfiles</div></div>
+    <div class="stat-card stat-ok"><div class="num">${rec}</div><div class="label">Recomendados</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--azul-claro)">${act}</div><div class="label">Activos</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--azul)">${prom === null ? "—" : CR.num(prom, 1) + "%"}</div><div class="label">Engagement promedio</div></div>`;
+}
+
+async function cargar() {
+  try {
+    PERFILES = (await CR.api("/api/creators/perfiles")).perfiles;
+  } catch (e) {
+    document.getElementById("cr-filas").innerHTML = `<tr><td colspan="8" class="cr-vacio">${CR.esc(e.message)}</td></tr>`;
+    return;
+  }
+  const paises = [...new Set(PERFILES.map((p) => p.pais).filter(Boolean))].sort();
+  document.getElementById("f-pais").innerHTML = '<option value="">Todos los países</option>' + paises.map((x) => `<option>${CR.esc(x)}</option>`).join("");
+  estadisticas(); pintar();
+}
+
+document.querySelectorAll(".cr-filtros input, .cr-filtros select").forEach((el) => el.addEventListener("input", pintar));
+document.querySelectorAll("th[data-orden]").forEach((th) => th.addEventListener("click", () => {
+  const c = th.dataset.orden;
+  ORDEN = { campo: c, dir: ORDEN.campo === c ? -ORDEN.dir : (["usuario", "pais", "estado"].includes(c) ? 1 : -1) };
+  pintar();
+}));
+cargar();
+</script>
+{% endblock %}

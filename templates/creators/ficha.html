@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Perfil — Creators Piazza{% endblock %}
+{% block body %}
+{% include "creators/_comun.html" %}
+<div id="f-avisos"></div>
+
+<div class="card"><div class="cr-top">
+  <div class="cr-id" id="f-id"><div class="cr-vacio">Cargando…</div></div>
+  <div class="cr-anillo" id="f-score"></div>
+</div></div>
+
+<div class="card"><h2>Métricas</h2><div class="cr-kpis" id="f-kpis"></div>
+  <div class="cr-mini" id="f-kpis-nota" style="margin-top:10px"></div></div>
+
+<div class="cr-cols">
+  <div class="card"><h2>Alertas</h2><div id="f-alertas"></div></div>
+  <div class="card"><h2>Análisis con IA</h2><div id="f-ia"></div></div>
+</div>
+
+<div class="card"><h2>Publicaciones recientes</h2><div class="cr-tabla" id="f-posts"></div></div>
+
+<div class="cr-cols">
+  <div class="card"><h2>Historial</h2><div id="f-historial"></div></div>
+  <div class="card"><h2>Campañas</h2><div id="f-campanas"></div></div>
+</div>
+
+<div class="card no-imprimir">
+  <h2>Datos del perfil</h2>
+  {% include "creators/_campos.html" %}
+  <div class="cr-acciones" style="margin-top:16px">
+    <button class="btn btn-primario" id="f-guardar">Guardar cambios</button>
+    <button class="btn btn-verde" id="f-reanalizar">Guardar y volver a analizar</button>
+    {% if ia_ok %}<label class="cr-mini" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="f-ia-check" checked style="width:auto"> con IA</label>{% endif %}
+    <span id="f-ok" class="cr-mini"></span>
+    <button class="btn btn-rojo btn-sm" id="f-borrar" style="margin-left:auto">Eliminar perfil</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PID = {{ pid|tojson }};
+let P = null;
+
+function kpi(valor, etiqueta, ref) {
+  return `<div class="cr-kpi"><div class="v">${valor}</div><div class="l">${etiqueta}</div>${ref ? `<div class="r">${ref}</div>` : ""}</div>`;
+}
+
+function pintar(datos) {
+  P = datos.perfil;
+  const d = P.datos || {}, m = P.metricas || {}, s = P.score || {}, ia = P.ia;
+  document.title = "@" + P.usuario + " — Creators Piazza";
+
+  const av = [];
+  (P.errores || []).forEach((e) => av.push(`<div class="cr-aviso error">${CR.esc(e)}</div>`));
+  document.getElementById("f-avisos").innerHTML = av.join("");
+
+  document.getElementById("f-id").innerHTML = `
+    ${CR.avatar(d.foto, P.usuario, true)}
+    <div>
+      <h1><a href="https://instagram.com/${CR.esc(P.usuario)}" target="_blank" rel="noopener">@${CR.esc(P.usuario)} ↗</a></h1>
+      <div class="meta">${CR.esc(d.nombre || P.nombre_contacto || "")}${P.pais ? " · " + CR.esc(P.pais) : ""}${P.ciudad ? ", " + CR.esc(P.ciudad) : ""}
+        · ${CR.esc(P.estado || "Candidato")}${P.tiktok ? " · TikTok " + CR.esc(P.tiktok) : ""}</div>
+      ${d.biografia ? `<div class="bio">${CR.esc(d.biografia)}</div>` : ""}
+      ${d.web ? `<div class="meta"><a href="${CR.esc(d.web)}" target="_blank" rel="noopener">${CR.esc(d.web)}</a></div>` : ""}
+      <div style="margin-top:8px">${CR.chips(P.marcas)}${CR.chips((ia && ia.nichos) || [])}${CR.chips(P.etiquetas)}</div>
+      ${P.email || P.telefono || P.tarifa ? `<div class="meta" style="margin-top:8px">${[P.email, P.telefono, P.tarifa && "Tarifa: " + P.tarifa].filter(Boolean).map(CR.esc).join(" · ")}</div>` : ""}
+      <div class="cr-mini" style="margin-top:8px">Analizado ${CR.fecha(P.analizado)} · datos ${P.fuente === "meta" ? "de Instagram" : "cargados a mano"}</div>
+    </div>`;
+
+  const barras = [["Engagement", s.engagement], ["Autenticidad", s.autenticidad], ["Afinidad", s.afinidad], ["Actividad", s.actividad]]
+    .map(([n, v]) => `<div class="cr-barra"><span>${n}</span><div class="pista"><i style="width:${v ?? 0}%"></i></div><b>${v ?? "—"}</b></div>`).join("");
+  const color = { "cr-s-alto": "#16a34a", "cr-s-medio": "#2563a8", "cr-s-bajo": "#d97706", "cr-s-malo": "#dc2626", "cr-s-nada": "#64748b" }[CR.claseScore(s.total)];
+  document.getElementById("f-score").innerHTML = `
+    <div class="num" style="color:${color}">${s.total ?? "—"}</div>
+    <div class="nivel" style="color:${color}">${CR.esc(s.nivel || "")}</div>
+    <div class="cr-barras">${barras}</div>
+    ${s.afinidad === null || s.afinidad === undefined ? '<div class="cr-mini">Sin análisis de IA: la afinidad no entra en el score.</div>' : ""}`;
+
+  const ref = m.er_referencia ? `Esperado para cuenta ${CR.esc((m.nivel_cuenta || "").toLowerCase())}: ${CR.num(m.er_referencia[0], 1)}–${CR.num(m.er_referencia[1], 1)}%` : "";
+  document.getElementById("f-kpis").innerHTML = [
+    kpi(CR.num(m.seguidores), "Seguidores", m.crecimiento_30d !== null && m.crecimiento_30d !== undefined ? `${m.crecimiento_30d > 0 ? "+" : ""}${CR.num(m.crecimiento_30d, 1)}% en el último mes` : CR.esc(m.nivel_cuenta || "")),
+    kpi(CR.pct(m.er), "Engagement", ref),
+    kpi(CR.pct(m.er_mediana), "Engagement (mediana)", "Sin el efecto de los virales"),
+    kpi(CR.num(m.interacciones_prom), "Interacciones por post", `${CR.num(m.likes_prom)} likes · ${CR.num(m.comentarios_prom)} coment.`),
+    kpi(CR.pct(m.ratio_comentarios), "Comentarios por cada 100 likes", "Normal: entre 1 y 5"),
+    kpi(m.vistas_prom ? CR.corto(m.vistas_prom) : "—", "Vistas promedio (reels)", m.tasa_vistas ? CR.num(m.tasa_vistas, 1) + "% de sus seguidores" : ""),
+    kpi(m.posts_semana ?? "—", "Posts por semana", m.dias_ultimo_post !== undefined ? `Último hace ${m.dias_ultimo_post} días` : ""),
+    kpi(CR.num(m.seguidos), "Seguidos", m.pct_reels !== undefined ? `${m.pct_reels}% de sus posts son reels` : ""),
+  ].join("");
+  document.getElementById("f-kpis-nota").textContent = m.manual ? "Métricas cargadas a mano por el equipo." :
+    `Calculado sobre ${m.posts_analizados || 0} posts (se excluyen los de menos de 48 h).${m.likes_ocultos ? " La cuenta oculta los likes en algunos posts." : ""}`;
+
+  const al = P.alertas || [];
+  document.getElementById("f-alertas").innerHTML = al.length ? al.map((a) =>
+    `<div class="cr-alerta cr-g-${a.gravedad}"><span class="punto"></span><span>${CR.esc(a.texto)}</span></div>`).join("") :
+    '<div class="cr-mini">Sin alertas: no se ven señales raras en las métricas.</div>';
+
+  const lst = (arr) => (arr && arr.length ? `<ul class="cr-lista">${arr.map((x) => `<li>${CR.esc(x)}</li>`).join("")}</ul>` : '<div class="cr-mini">—</div>');
+  document.getElementById("f-ia").innerHTML = ia ? `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="cr-recom cr-r-${CR.esc(ia.recomendacion)}">${CR.esc(ia.recomendacion)}</span>
+      ${ia.mejor_marca ? `<span class="cr-mini">Encaja mejor con <b>${CR.esc(ia.mejor_marca)}</b></span>` : ""}</div>
+    <p style="font-size:14px;line-height:1.55;margin-top:10px">${CR.esc(ia.resumen)}</p>
+    <div class="cr-etq">Fortalezas</div>${lst(ia.fortalezas)}
+    <div class="cr-etq">Riesgos</div>${lst(ia.riesgos)}
+    ${ia.tono ? `<div class="cr-etq">Tono</div><div style="font-size:14px">${CR.esc(ia.tono)}</div>` : ""}
+    ${ia.publico_estimado ? `<div class="cr-etq">Público estimado</div><div style="font-size:14px">${CR.esc(ia.publico_estimado)}</div>` : ""}
+    ${ia.ideas_colaboracion && ia.ideas_colaboracion.length ? `<div class="cr-etq">Ideas de colaboración</div>${lst(ia.ideas_colaboracion)}` : ""}
+    <div class="cr-mini" style="margin-top:12px">Análisis del ${CR.fecha(ia.fecha)}. Es una lectura automática: confírmala antes de decidir.</div>` :
+    '<div class="cr-mini">{% if ia_ok %}Este perfil no tiene análisis con IA. Usa “Guardar y volver a analizar” con la casilla “con IA”.{% else %}La IA no está conectada todavía.{% endif %}</div>';
+
+  const posts = P.posts || [];
+  const seg = m.seguidores || 0;
+  document.getElementById("f-posts").innerHTML = posts.length ? `<table><thead><tr><th>Fecha</th><th>Tipo</th>
+      <th class="cr-num">Likes</th><th class="cr-num">Coment.</th><th class="cr-num">Vistas</th><th class="cr-num">Engagement</th><th>Texto</th></tr></thead><tbody>
+    ${posts.slice(0, 25).map((p) => {
+      const er = seg ? (((p.likes || 0) + (p.comentarios || 0)) / seg) * 100 : null;
+      return `<tr style="cursor:default"><td class="cr-mini"><a href="${CR.esc(p.enlace)}" target="_blank" rel="noopener">${CR.fecha(p.fecha)} ↗</a></td>
+        <td>${CR.esc(p.tipo)}</td><td class="cr-num">${p.likes === null ? "oculto" : CR.num(p.likes)}</td>
+        <td class="cr-num">${CR.num(p.comentarios)}</td><td class="cr-num">${p.vistas ? CR.corto(p.vistas) : "—"}</td>
+        <td class="cr-num">${CR.pct(er)}</td><td class="cr-mini" style="max-width:380px">${CR.esc((p.texto || "").slice(0, 140))}${(p.texto || "").length > 140 ? "…" : ""}</td></tr>`;
+    }).join("")}</tbody></table>` : '<div class="cr-mini">No hay publicaciones: el perfil se cargó a mano.</div>';
+
+  const h = (P.historial || []).slice().reverse();
+  document.getElementById("f-historial").innerHTML = h.length ? `<table><thead><tr><th>Fecha</th><th class="cr-num">Seguidores</th>
+    <th class="cr-num">Engagement</th><th class="cr-num">Score</th></tr></thead><tbody>
+    ${h.slice(0, 24).map((x) => `<tr style="cursor:default"><td>${CR.fecha(x.fecha)}</td><td class="cr-num">${CR.num(x.seguidores)}</td>
+      <td class="cr-num">${CR.pct(x.er)}</td><td class="cr-num">${x.score ?? "—"}</td></tr>`).join("")}</tbody></table>
+    <div class="cr-mini" style="margin-top:8px">Se guarda una foto cada vez que se analiza. Reanaliza una vez al mes para ver el crecimiento.</div>` :
+    '<div class="cr-mini">Sin historial todavía.</div>';
+
+  const cs = datos.campanas || [];
+  document.getElementById("f-campanas").innerHTML = cs.length ? `<table><tbody>${cs.map((c) => `
+    <tr onclick="location.href='/creators/campanas/${c.id}'"><td><b>${CR.esc(c.nombre)}</b><div class="cr-mini">${CR.esc(c.marca || "")} · ${CR.esc(c.estado || "")} · ${CR.fecha(c.inicio)}</div></td>
+    <td class="cr-num">${c.posts} posts<div class="cr-mini">${CR.dinero(c.costo)}</div></td></tr>`).join("")}</tbody></table>` :
+    '<div class="cr-mini">Todavía no participó en campañas. Se agrega desde la pantalla de la campaña.</div>';
+}
+
+async function cargar() {
+  try {
+    const datos = await CR.api("/api/creators/perfiles/" + PID);
+    pintar(datos);
+    ponerCampos(datos.perfil);
+  } catch (e) {
+    document.getElementById("f-id").innerHTML = `<div class="cr-vacio"><b>${CR.esc(e.message)}</b><a href="/creators">Volver a la lista</a></div>`;
+  }
+}
+
+async function guardar(reanalizar) {
+  const ok = document.getElementById("f-ok");
+  ok.textContent = "";
+  const body = leerCampos();
+  try {
+    if (reanalizar) {
+      const ia = document.getElementById("f-ia-check");
+      body.con_ia = ia ? ia.checked : false;
+      CR.cargando(true, "Volviendo a consultar y analizar el perfil… puede tardar hasta un minuto.");
+      await CR.api("/api/creators/perfiles/" + PID, { method: "PATCH", body });
+      await CR.api(`/api/creators/perfiles/${PID}/analizar`, { method: "POST", body });
+      await cargar();
+      ok.textContent = "Análisis actualizado.";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      await CR.api("/api/creators/perfiles/" + PID, { method: "PATCH", body });
+      await cargar();
+      ok.textContent = "Cambios guardados.";
+    }
+  } catch (e) {
+    ok.innerHTML = `<span style="color:var(--rojo)">${CR.esc(e.message)}</span>`;
+  } finally { CR.cargando(false); }
+}
+
+document.getElementById("f-guardar").addEventListener("click", () => guardar(false));
+document.getElementById("f-reanalizar").addEventListener("click", () => guardar(true));
+document.getElementById("f-borrar").addEventListener("click", async () => {
+  if (!P || !confirm(`¿Eliminar @${P.usuario} de la base? También se quita de las campañas. No se puede deshacer.`)) return;
+  try { await CR.api("/api/creators/perfiles/" + PID, { method: "DELETE" }); location.href = "/creators"; }
+  catch (e) { alert(e.message); }
+});
+cargar();
+</script>
+{% endblock %}

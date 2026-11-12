@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Registrar perfil — Creators Piazza{% endblock %}
+{% block body %}
+{% include "creators/_comun.html" %}
+
+<div class="cr-cabecera"><h1>Registrar perfil<small>Escribe el usuario de Instagram: el sistema lo consulta, lo analiza y le pone un score.</small></h1></div>
+
+<div class="card">
+  <div id="n-error"></div>
+  <div class="campo">
+    <label for="n-usuario">Usuario de Instagram</label>
+    <input id="n-usuario" maxlength="200" placeholder="@usuario o enlace del perfil" autofocus>
+    <div class="hint">{% if meta_ok %}Tiene que ser una cuenta profesional (creador o empresa). Si es personal, marca “Cargar las métricas a mano” abajo.{% else %}Instagram todavía no está conectado: carga las métricas a mano abajo.{% endif %}</div>
+  </div>
+  {% include "creators/_campos.html" %}
+
+  <div class="cr-acciones" style="margin-top:18px">
+    <button class="btn btn-primario" id="n-guardar">Registrar y analizar</button>
+    {% if ia_ok %}<label class="cr-mini" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="n-ia" checked style="width:auto"> Incluir análisis con IA</label>{% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if not meta_ok %}
+document.getElementById("c-modo-manual").checked = true;
+document.getElementById("c-det-extra").open = true;
+{% endif %}
+document.getElementById("n-guardar").addEventListener("click", async () => {
+  const caja = document.getElementById("n-error");
+  caja.innerHTML = "";
+  const body = { usuario: document.getElementById("n-usuario").value, ...leerCampos() };
+  const ia = document.getElementById("n-ia");
+  body.con_ia = ia ? ia.checked : false;
+  if (!body.usuario.trim()) { caja.innerHTML = '<div class="cr-aviso error">Escribe el usuario de Instagram.</div>'; return; }
+  CR.cargando(true, "Consultando Instagram y analizando el perfil… puede tardar hasta un minuto.");
+  try {
+    const r = await CR.api("/api/creators/perfiles", { method: "POST", body });
+    location.href = "/creators/p/" + r.perfil.id;
+  } catch (e) {
+    CR.cargando(false);
+    const enlace = e.datos && e.datos.id ? ` <a href="/creators/p/${e.datos.id}">Ver su ficha →</a>` : "";
+    caja.innerHTML = `<div class="cr-aviso error">${CR.esc(e.message)}${enlace}</div>`;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
+</script>
+{% endblock %}

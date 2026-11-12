@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Reporte de campaña — Creators Piazza{% endblock %}
+{% block body %}
+<link rel="stylesheet" href="{{ url_for('static', filename='creators.css') }}">
+<script src="{{ url_for('static', filename='creators.js') }}"></script>
+
+<div class="cr-cabecera">
+  <h1 id="r-titulo">Reporte de campaña<small id="r-sub"></small></h1>
+  <a class="btn btn-gris btn-sm no-imprimir" href="/creators/campanas/{{ cid }}">← Editar campaña</a>
+  <button class="btn btn-primario btn-sm no-imprimir" onclick="window.print()">Imprimir / PDF</button>
+</div>
+
+<div class="stats-grid" id="r-kpis"></div>
+
+<div class="card"><h2>Resultados por influencer</h2>
+  <div class="cr-tabla" id="r-tabla"></div>
+  <div class="cr-mini" style="margin-top:10px">CPE: costo por interacción (likes + comentarios + guardados + compartidos). CPM: costo por mil impresiones
+    (o por mil de alcance o vistas si no hay impresiones). “vs. habitual”: engagement en la campaña comparado con su engagement normal (100 = igual).
+    Ordenado de mejor a peor CPE.</div>
+</div>
+
+<div class="card"><h2>Conclusiones</h2><div id="r-conclusiones"></div>
+  {% if ia_ok %}<button class="btn btn-verde btn-sm no-imprimir" id="r-generar" style="margin-top:12px">Generar conclusiones con IA</button>{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CID = {{ cid|tojson }};
+function stat(v, l) { return `<div class="stat-card"><div class="num" style="font-size:22px;color:var(--azul);overflow-wrap:anywhere">${v}</div><div class="label">${l}</div></div>`; }
+function pintar(d) {
+  const c = d.campana, t = d.reporte.totales, mon = c.moneda || "USD";
+  document.title = "Reporte " + c.nombre + " — Creators Piazza";
+  document.getElementById("r-titulo").innerHTML = CR.esc(c.nombre) +
+    `<small>${[c.marca, c.pais, c.inicio && CR.fecha(c.inicio) + " – " + CR.fecha(c.fin), c.estado].filter(Boolean).map(CR.esc).join(" · ")}${c.objetivo ? "<br>Objetivo: " + CR.esc(c.objetivo) : ""}</small>`;
+  document.getElementById("r-kpis").innerHTML = [
+    stat(t.influencers, "Influencers"), stat(t.posts, "Publicaciones"),
+    stat(CR.dinero(t.costo, mon), c.presupuesto ? "Invertido de " + CR.dinero(c.presupuesto, mon) : "Inversión"),
+    stat(CR.corto(t.alcance || null), "Alcance"), stat(CR.corto(t.vistas || null), "Vistas"),
+    stat(CR.corto(t.interacciones), "Interacciones"), stat(CR.dinero(t.cpe, mon), "CPE"), stat(CR.dinero(t.cpm, mon), "CPM"),
+    ...(t.ventas ? [stat(CR.num(t.ventas), "Ventas"), stat(CR.dinero(t.costo_venta, mon), "Costo por venta")] : []),
+  ].join("");
+  const f = d.reporte.filas;
+  document.getElementById("r-tabla").innerHTML = f.length ? `<table style="min-width:980px"><thead><tr>
+    <th>Influencer</th><th class="cr-num">Seguidores</th><th class="cr-num">Costo</th><th class="cr-num">Posts</th>
+    <th class="cr-num">Alcance</th><th class="cr-num">Vistas</th><th class="cr-num">Interacciones</th><th class="cr-num">Clics</th>
+    <th class="cr-num">Ventas</th><th class="cr-num">CPE</th><th class="cr-num">CPM</th><th class="cr-num">ER campaña</th><th class="cr-num">vs. habitual</th></tr></thead><tbody>
+    ${f.map((x) => `<tr style="cursor:default"><td><b>@${CR.esc(x.usuario)}</b><div class="cr-mini">${CR.esc(x.nombre)}</div></td>
+      <td class="cr-num">${CR.corto(x.seguidores)}</td><td class="cr-num">${CR.dinero(x.costo, mon)}</td><td class="cr-num">${x.posts}</td>
+      <td class="cr-num">${CR.corto(x.alcance)}</td><td class="cr-num">${CR.corto(x.vistas)}</td><td class="cr-num">${CR.num(x.interacciones)}</td>
+      <td class="cr-num">${CR.num(x.clics)}</td><td class="cr-num">${CR.num(x.ventas)}</td><td class="cr-num"><b>${CR.dinero(x.cpe, mon)}</b></td>
+      <td class="cr-num">${CR.dinero(x.cpm, mon)}${x.cpm ? `<div class="cr-mini">por ${x.cpm_base}</div>` : ""}</td>
+      <td class="cr-num">${CR.pct(x.er_campana)}</td>
+      <td class="cr-num" style="color:${x.vs_habitual >= 100 ? "var(--verde)" : x.vs_habitual ? "var(--amarillo)" : "inherit"}">${x.vs_habitual ?? "—"}</td></tr>`).join("")}
+    </tbody></table>` : '<div class="cr-vacio">La campaña no tiene influencers cargados.</div>';
+  const k = c.conclusiones;
+  const lst = (a) => (a && a.length ? `<ul class="cr-lista">${a.map((x) => `<li>${CR.esc(x)}</li>`).join("")}</ul>` : "");
+  document.getElementById("r-conclusiones").innerHTML = k ? `<p style="font-size:14px;line-height:1.6">${CR.esc(k.resumen)}</p>
+    <div class="cr-cols"><div><div class="cr-etq">Lo que funcionó</div>${lst(k.destacados)}</div><div><div class="cr-etq">A mejorar</div>${lst(k.a_mejorar)}</div></div>
+    <div class="cr-etq">Recomendaciones</div>${lst(k.recomendaciones)}
+    <div class="cr-mini" style="margin-top:10px">Generado con IA el ${CR.fecha(k.fecha)} a partir de los números de arriba.</div>` :
+    '<div class="cr-mini">Todavía no hay conclusiones.{% if ia_ok %} Genéralas cuando estén cargadas todas las métricas.{% endif %}</div>';
+  const btn = document.getElementById("r-generar");
+  if (btn) btn.textContent = k ? "Volver a generar conclusiones" : "Generar conclusiones con IA";
+}
+const btn = document.getElementById("r-generar");
+if (btn) btn.addEventListener("click", async () => {
+  CR.cargando(true, "Escribiendo las conclusiones…");
+  try { pintar(await CR.api(`/api/creators/campanas/${CID}/conclusiones`, { method: "POST" })); }
+  catch (e) { alert(e.message); } finally { CR.cargando(false); }
+});
+CR.api("/api/creators/campanas/" + CID).then(pintar).catch((e) => {
+  document.getElementById("r-tabla").innerHTML = `<div class="cr-vacio"><b>${CR.esc(e.message)}</b></div>`;
+});
+</script>
+{% endblock %}
