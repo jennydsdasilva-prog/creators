@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Entrar — Creators Piazza</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icono.png') }}">
+  <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='favicon-48.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -45,8 +46,7 @@
       display: flex;
       justify-content: center;
     }
-    .logo .marca { color: white; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
-    .logo .marca span { color: #93c5fd; }
+    .logo img { height: 64px; display: block; }
     .sub {
       text-align: center;
       color: var(--texto-suave);
@@ -98,7 +98,7 @@
 <body>
   <form class="caja" method="post" action="{{ url_for('login') }}">
     <div class="logo">
-      <span class="marca">PIAZZA <span>Creators</span></span>
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="Creators Piazza">
     </div>
     <div class="sub">Base de influencers de Piazza · acceso del equipo</div>
 
