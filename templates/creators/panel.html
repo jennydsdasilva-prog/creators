@@ -66,9 +66,10 @@ function filtrados() {
 const COLOR_VALOR = { "Buen valor": "var(--verde)", "Valor medio": "var(--azul)", "Caro": "var(--rojo)" };
 function valorCelda(v) {
   if (!v) return '<span class="cr-mini">—</span>';
-  if (v.canje && !v.usd) return '<span class="cr-mini">Canje</span>';
+  if (v.canje && !v.monto) return '<span class="cr-mini">Canje</span>';
+  if (v.usd === null || v.usd === undefined) return `${CR.esc(v.moneda)} ${CR.corto(v.monto)}<div class="cr-mini">Falta USD</div>`;
   const det = v.cpe !== undefined ? `USD ${CR.num(v.cpe, 2)}/interacción` : v.cpm_vistas !== undefined ? `USD ${CR.num(v.cpm_vistas, 1)}/mil vistas` : "";
-  return `USD ${CR.num(v.usd)}${v.calificacion ? `<div class="cr-mini" style="color:${COLOR_VALOR[v.calificacion]};font-weight:600">${CR.esc(v.calificacion)}</div>` : ""}${det ? `<div class="cr-mini">${det}</div>` : ""}`;
+  return `USD ${CR.num(v.usd)}${v.publicaciones ? `<div class="cr-mini">${v.publicaciones} publicaciones</div>` : ""}${v.calificacion ? `<div class="cr-mini" style="color:${COLOR_VALOR[v.calificacion]};font-weight:600">${CR.esc(v.calificacion)}</div>` : ""}${det ? `<div class="cr-mini">${det}</div>` : ""}`;
 }
 
 function pintar() {

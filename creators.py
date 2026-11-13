@@ -717,7 +717,7 @@ def contexto_perfil(perfil, m, alertas_lista):
         f"Perfil: {'@' + perfil['usuario'] if perfil.get('usuario') else 'sin usuario registrado'} "
         f"({datos.get('nombre') or perfil.get('nombre_contacto') or 'sin nombre'}) · plataforma: {perfil.get('plataforma') or 'instagram'}\n"
         f"En análisis desde: {perfil.get('en_analisis_desde') or 'sin dato'} · Origen: {perfil.get('origen') or 'sin dato'} · "
-        f"Tarifa/costo: {perfil.get('tarifa') or 'sin dato'} · Valor precio/alcance: {json.dumps(valor_precio(perfil), ensure_ascii=False)}\n"
+        f"Costo: {perfil.get('tarifa_local') or ''} {('USD ' + str(perfil.get('tarifa_usd'))) if perfil.get('tarifa_usd') else ''} · incluye: {perfil.get('tarifa') or 'sin dato'} · Valor precio/alcance: {json.dumps(valor_precio(perfil), ensure_ascii=False)}\n"
         f"Audiencia (según sus estadísticas): países {perfil.get('audiencia_paises') or 'sin dato'} · ciudades "
         f"{perfil.get('audiencia_ciudades') or 'sin dato'} · mujeres {perfil.get('audiencia_mujeres') or 'sin dato'}% · "
         f"edades {perfil.get('audiencia_edades') or 'sin dato'} · fuente {perfil.get('audiencia_fuente') or 'sin dato'}\n"
@@ -944,6 +944,38 @@ VALOR_CPM_VISTAS = (10, 25)     # costo por mil vistas
 VALOR_CPM_SEG = (10, 25)        # costo por mil seguidores (solo si no hay más datos)
 
 
+MONEDAS = {  # código: palabras con que suele aparecer
+    "COP": ("cop", "peso col", "pesos col"), "USD": ("usd", "us$", "dólar", "dolar"),
+    "VES": ("ves", "bs", "bolívar", "bolivar"), "PEN": ("pen", "s/", "sol"), "MXN": ("mxn",),
+    "ARS": ("ars",), "CLP": ("clp",), "CRC": ("crc", "colón", "colon"), "GTQ": ("gtq", "quetzal"),
+    "DOP": ("dop", "rd$"), "PAB": ("pab", "balboa"), "HNL": ("hnl", "lempira"), "BOB": ("bob",),
+}
+
+
+def _monto(texto):
+    m = re.search(r"(\d[\d.,]*)\s*(k|mil(?:lones|lón|lon)?|m(?![a-z]))?", (texto or "").lower())
+    if not m:
+        return None
+    numero, sufijo = m.group(1), m.group(2) or ""
+    if re.fullmatch(r"\d{1,3}([.,]\d{3})+", numero):        # 1.800.000 / 1,800,000
+        monto = float(re.sub(r"[.,]", "", numero))
+    else:
+        monto = float(numero.replace(",", "."))
+    if sufijo.startswith("millon") or sufijo.startswith("millón") or sufijo == "m":
+        monto *= 1_000_000
+    elif sufijo in ("k", "mil"):
+        monto *= 1000
+    return monto
+
+
+def _moneda(texto):
+    baja = f" {(texto or '').lower()} "
+    for codigo, claves in MONEDAS.items():
+        if any(re.search(r"(?<![a-z])" + re.escape(c) + r"(?![a-z])", baja) for c in claves):
+            return codigo
+    return None
+
+
 def leer_precio(tarifa):
     """'COP 1.800.000 + IVA', 'USD 350 por reel', '$120', 'Canje' → {monto, moneda, usd} o None.
     Si hay varios precios, toma el primero (normalmente el del reel o el paquete)."""
@@ -951,20 +983,34 @@ def leer_precio(tarifa):
     if not t:
         return None
     baja = t.lower()
-    m = re.search(r"(\d[\d.,]*)\s*(k|mil)?", baja)
-    if not m:
+    monto = _monto(t)
+    if monto is None:
         return {"canje": True} if "canje" in baja else None
-    numero, sufijo = m.group(1), m.group(2)
-    if re.fullmatch(r"\d{1,3}([.,]\d{3})+", numero):        # 1.800.000 / 1,800,000
-        monto = float(re.sub(r"[.,]", "", numero))
-    else:
-        monto = float(numero.replace(",", "."))
-    if sufijo:
-        monto *= 1000
-    es_cop = "cop" in baja or "peso" in baja or monto >= 20000   # nadie cobra USD 20.000 por un post
-    moneda = "COP" if es_cop else "USD"
-    usd = monto / TASA_COP if es_cop else monto
-    return {"monto": monto, "moneda": moneda, "usd": round(usd, 2), "canje": "canje" in baja}
+    moneda = _moneda(t) or ("COP" if monto >= 20000 else "USD")   # nadie cobra USD 20.000 por un post
+    usd = monto / TASA_COP if moneda == "COP" else monto if moneda == "USD" else None
+    return {"monto": monto, "moneda": moneda, "usd": round(usd, 2) if usd is not None else None,
+            "canje": "canje" in baja}
+
+
+def precio_perfil(p):
+    """Usa los dos campos de costo (moneda local y USD); si están vacíos, lee la tarifa escrita."""
+    local = leer_precio(p.get("tarifa_local")) if p.get("tarifa_local") else None
+    usd = _numero(p.get("tarifa_usd"))
+    if usd:
+        precio = {"usd": round(usd, 2), "usd_fuente": "registrado", "canje": False}
+        if local and local.get("monto") and local.get("moneda") != "USD":
+            precio.update(monto=local["monto"], moneda=local["moneda"])
+        else:
+            precio.update(monto=usd, moneda="USD")
+        return precio
+    if local:
+        if local.get("usd") is not None:
+            local["usd_fuente"] = "convertido" if local.get("moneda") == "COP" else "registrado"
+        return local
+    precio = leer_precio(p.get("tarifa"))
+    if precio and precio.get("usd") is not None and precio.get("moneda") == "COP":
+        precio["usd_fuente"] = "convertido"
+    return precio
 
 
 def _calificar(valor, rango):
@@ -972,15 +1018,24 @@ def _calificar(valor, rango):
 
 
 def valor_precio(p):
-    """Compara lo que cobra con el alcance que tiene."""
-    precio = leer_precio(p.get("tarifa"))
+    """Compara lo que cobra con el alcance que tiene. Si la tarifa incluye varias publicaciones,
+    divide el precio entre ellas para compararlo con el alcance de una publicación promedio."""
+    precio = precio_perfil(p)
     if not precio:
         return None
-    if precio.get("canje") and not precio.get("usd"):
+    if precio.get("canje") and not precio.get("monto"):
         return {"canje": True, "texto": "Canje"}
+    v = {k: precio.get(k) for k in ("monto", "moneda", "usd", "usd_fuente", "canje")}
+    usd_total = precio.get("usd")
+    if usd_total is None:
+        v["sin_conversion"] = True   # moneda local sin su equivalente en dólares
+        return v
+    pubs = _numero(p.get("publicaciones_incluidas"))
+    pubs = int(pubs) if pubs and pubs >= 1 else 1
+    usd = usd_total / pubs
+    if pubs > 1:
+        v["publicaciones"], v["usd_por_publicacion"] = pubs, round(usd, 2)
     m = p.get("metricas") or {}
-    usd = precio["usd"]
-    v = {"monto": precio["monto"], "moneda": precio["moneda"], "usd": usd, "canje": precio.get("canje", False)}
     seg, inter, vistas = m.get("seguidores"), m.get("interacciones_prom"), m.get("vistas_prom")
     verificable = (m.get("pct_likes_ocultos") or 0) < OCULTOS_SIN_SCORE
     if seg:
@@ -1004,7 +1059,8 @@ CAMPOS_MANUALES = ("seguidores", "seguidos", "likes_prom", "comentarios_prom", "
 def _aplicar_campos(perfil, body):
     textos = {"audiencia_paises": 200, "audiencia_ciudades": 200, "audiencia_edades": 120,
               "audiencia_mujeres": 10, "audiencia_fuente": 120, "origen": 80, "nombre_contacto": 120, "pais": 60, "ciudad": 80, "nicho": 120, "tiktok": 80,
-              "email": 160, "telefono": 60, "tarifa": 120, "notas": 4000, "responsable": 80,
+              "email": 160, "telefono": 60, "tarifa": 300, "tarifa_local": 60, "tarifa_usd": 20,
+              "publicaciones_incluidas": 5, "notas": 4000, "responsable": 80,
               "comentarios_muestra": 6000}
     for campo, maximo in textos.items():
         if campo in body:
@@ -1523,7 +1579,7 @@ def api_exportar():
     w = csv.writer(salida)
     w.writerow(["Usuario", "Enlace", "Nombre", "País", "Ciudad", "Marcas", "Nicho", "Estado", "Seguidores",
                 "Nivel cuenta", "Engagement %", "Score", "Nivel", "Recomendación IA", "Email", "Teléfono",
-                "Tarifa", "TikTok", "Etiquetas", "En análisis desde", "Origen", "Audiencia países", "Audiencia ciudades", "Precio USD", "Costo por interacción USD", "Costo por mil vistas USD", "Valor", "Analizado"])
+                "Costo moneda local", "Costo USD", "Qué incluye", "TikTok", "Etiquetas", "En análisis desde", "Origen", "Audiencia países", "Audiencia ciudades", "Precio USD", "Costo por interacción USD", "Costo por mil vistas USD", "Valor", "Analizado"])
     for p in _leer()["perfiles"].values():
         r, m = resumen_perfil(p), p.get("metricas") or {}
         w.writerow([f"@{p['usuario']}" if p.get("usuario") else "", f"https://instagram.com/{p['usuario']}" if p.get("usuario") else "", r["nombre"], p.get("pais", ""),
@@ -1531,7 +1587,7 @@ def api_exportar():
                     m.get("seguidores") or "", m.get("nivel_cuenta") or "",
                     str(m.get("er") or "").replace(".", ","), r["score"] if r["score"] is not None else "",
                     r["nivel"] or "", r["recomendacion"] or "", p.get("email", ""), p.get("telefono", ""),
-                    p.get("tarifa", ""), p.get("tiktok", ""), ", ".join(r["etiquetas"]),
+                    p.get("tarifa_local", ""), p.get("tarifa_usd", ""), p.get("tarifa", ""), p.get("tiktok", ""), ", ".join(r["etiquetas"]),
                     r["en_analisis_desde"], p.get("origen", ""), p.get("audiencia_paises", ""),
                     p.get("audiencia_ciudades", ""),
                     *[str((r["valor"] or {}).get(k, "")).replace(".", ",") for k in ("usd", "cpe", "cpm_vistas")],

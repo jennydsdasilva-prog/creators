@@ -51,9 +51,17 @@
 <div class="cr-grid-3">
   <div class="campo"><label for="c-email">Email</label><input id="c-email" type="email" maxlength="160"></div>
   <div class="campo"><label for="c-telefono">Teléfono / WhatsApp</label><input id="c-telefono" maxlength="60"></div>
-  <div class="campo"><label for="c-tarifa">Tarifa referencial</label><input id="c-tarifa" maxlength="120" placeholder="Ej: USD 300 por reel"></div>
   <div class="campo"><label for="c-responsable">Responsable en Piazza</label><input id="c-responsable" maxlength="80"></div>
 </div>
+<div class="cr-grid-3">
+  <div class="campo"><label for="c-tarifa_local">Costo en moneda local</label><input id="c-tarifa_local" maxlength="60" placeholder="Ej: COP 1.800.000">
+    <div class="hint">Con el código de la moneda: COP, VES, PEN, MXN…</div></div>
+  <div class="campo"><label for="c-tarifa_usd">Costo en dólares (USD)</label><input id="c-tarifa_usd" maxlength="20" inputmode="decimal" placeholder="Ej: 550">
+    <div class="hint">Si lo dejas vacío y el costo es en COP, se convierte solo.</div></div>
+  <div class="campo"><label for="c-publicaciones_incluidas">Publicaciones incluidas</label><input id="c-publicaciones_incluidas" maxlength="5" inputmode="numeric" placeholder="1">
+    <div class="hint">Reels/posts que cubre ese costo, para comparar por publicación.</div></div>
+</div>
+<div class="campo"><label for="c-tarifa">Qué incluye la tarifa</label><input id="c-tarifa" maxlength="300" placeholder="Ej: 1 reel + 3 historias, negociable"></div>
 <div class="campo"><label for="c-notas">Notas del equipo</label>
   <textarea id="c-notas" rows="3" maxlength="4000" placeholder="Cómo llegó, con quién habló, qué pidió…"></textarea>
   <div class="hint">La IA también las lee al analizar.</div></div>
@@ -78,7 +86,7 @@
 </details>
 
 <script>
-const CAMPOS_TEXTO = ["audiencia_paises", "audiencia_ciudades", "audiencia_mujeres", "audiencia_edades", "audiencia_fuente", "usuario", "plataforma", "en_analisis_desde", "origen", "afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "responsable", "notas", "comentarios_muestra"];
+const CAMPOS_TEXTO = ["audiencia_paises", "audiencia_ciudades", "audiencia_mujeres", "audiencia_edades", "audiencia_fuente", "usuario", "plataforma", "en_analisis_desde", "origen", "afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "tarifa_local", "tarifa_usd", "publicaciones_incluidas", "responsable", "notas", "comentarios_muestra"];
 const CAMPOS_MANUAL = ["seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post"];
 function leerCampos() {
   const b = {};
