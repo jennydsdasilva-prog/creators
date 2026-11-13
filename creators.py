@@ -1044,7 +1044,15 @@ def valor_precio(p):
         v["cpe"] = round(usd / inter, 3)
     if vistas:
         v["cpm_vistas"] = round(usd / vistas * 1000, 2)
-    if "cpe" in v:
+    extra = _numero(p.get("alcance_extra"))
+    if extra and extra > 0:
+        # Paquete con otros canales (ej. podcast): se compara el costo total con todas las vistas del mes.
+        vistas_pubs = (vistas or 0) * pubs
+        v["alcance_extra"] = int(extra)
+        v["vistas_paquete"] = int(vistas_pubs + extra)
+        v["cpm_paquete"] = round(usd_total / v["vistas_paquete"] * 1000, 2)
+        v["calificacion"], v["base"] = _calificar(v["cpm_paquete"], VALOR_CPM_VISTAS), "por mil vistas del paquete"
+    elif "cpe" in v:
         v["calificacion"], v["base"] = _calificar(v["cpe"], VALOR_CPE), "por interacción"
     elif "cpm_vistas" in v:
         v["calificacion"], v["base"] = _calificar(v["cpm_vistas"], VALOR_CPM_VISTAS), "por mil vistas"
@@ -1060,7 +1068,7 @@ def _aplicar_campos(perfil, body):
     textos = {"audiencia_paises": 200, "audiencia_ciudades": 200, "audiencia_edades": 120,
               "audiencia_mujeres": 10, "audiencia_fuente": 120, "origen": 80, "nombre_contacto": 120, "pais": 60, "ciudad": 80, "nicho": 120, "tiktok": 80,
               "email": 160, "telefono": 60, "tarifa": 300, "tarifa_local": 60, "tarifa_usd": 20,
-              "publicaciones_incluidas": 5, "notas": 4000, "responsable": 80,
+              "publicaciones_incluidas": 5, "alcance_extra": 15, "alcance_extra_detalle": 200, "notas": 4000, "responsable": 80,
               "comentarios_muestra": 6000}
     for campo, maximo in textos.items():
         if campo in body:

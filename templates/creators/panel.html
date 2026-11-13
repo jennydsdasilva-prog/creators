@@ -68,7 +68,7 @@ function valorCelda(v) {
   if (!v) return '<span class="cr-mini">—</span>';
   if (v.canje && !v.monto) return '<span class="cr-mini">Canje</span>';
   if (v.usd === null || v.usd === undefined) return `${CR.esc(v.moneda)} ${CR.corto(v.monto)}<div class="cr-mini">Falta USD</div>`;
-  const det = v.cpe !== undefined ? `USD ${CR.num(v.cpe, 2)}/interacción` : v.cpm_vistas !== undefined ? `USD ${CR.num(v.cpm_vistas, 1)}/mil vistas` : "";
+  const det = v.cpm_paquete !== undefined ? `USD ${CR.num(v.cpm_paquete, 1)}/mil vistas` : v.cpe !== undefined ? `USD ${CR.num(v.cpe, 2)}/interacción` : v.cpm_vistas !== undefined ? `USD ${CR.num(v.cpm_vistas, 1)}/mil vistas` : "";
   return `USD ${CR.num(v.usd)}${v.publicaciones ? `<div class="cr-mini">${v.publicaciones} publicaciones</div>` : ""}${v.calificacion ? `<div class="cr-mini" style="color:${COLOR_VALOR[v.calificacion]};font-weight:600">${CR.esc(v.calificacion)}</div>` : ""}${det ? `<div class="cr-mini">${det}</div>` : ""}`;
 }
 
@@ -124,7 +124,7 @@ async function cargar() {
     const RANGO = { "Buen valor": 1, "Valor medio": 2, "Caro": 3 };
     PERFILES.forEach((p) => {
       p.nicho_txt = p.nicho || (p.nichos || []).join(", ");
-      p.valor_orden = p.valor && p.valor.calificacion ? RANGO[p.valor.calificacion] * 1e6 + (p.valor.cpe ?? p.valor.cpm_vistas ?? 0) : null;
+      p.valor_orden = p.valor && p.valor.calificacion ? RANGO[p.valor.calificacion] * 1e6 + (p.valor.cpm_paquete ?? p.valor.cpe ?? p.valor.cpm_vistas ?? 0) : null;
     });
   } catch (e) {
     document.getElementById("cr-filas").innerHTML = `<tr><td colspan="10" class="cr-vacio">${CR.esc(e.message)}</td></tr>`;

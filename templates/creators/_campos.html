@@ -61,6 +61,11 @@
   <div class="campo"><label for="c-publicaciones_incluidas">Publicaciones incluidas</label><input id="c-publicaciones_incluidas" maxlength="5" inputmode="numeric" placeholder="1">
     <div class="hint">Reels/posts que cubre ese costo, para comparar por publicación.</div></div>
 </div>
+<div class="cr-grid-3">
+  <div class="campo"><label for="c-alcance_extra">Vistas extra incluidas (por mes)</label><input id="c-alcance_extra" maxlength="15" inputmode="numeric" placeholder="Ej: 80000">
+    <div class="hint">Alcance de otros canales que entran en el precio (podcast, YouTube, Facebook).</div></div>
+  <div class="campo" style="grid-column: span 2"><label for="c-alcance_extra_detalle">De dónde salen esas vistas</label><input id="c-alcance_extra_detalle" maxlength="200" placeholder="Ej: Podcast YouTube: 4 episodios × ~20K vistas"></div>
+</div>
 <div class="campo"><label for="c-tarifa">Qué incluye la tarifa</label><input id="c-tarifa" maxlength="300" placeholder="Ej: 1 reel + 3 historias, negociable"></div>
 <div class="campo"><label for="c-notas">Notas del equipo</label>
   <textarea id="c-notas" rows="3" maxlength="4000" placeholder="Cómo llegó, con quién habló, qué pidió…"></textarea>
@@ -86,7 +91,7 @@
 </details>
 
 <script>
-const CAMPOS_TEXTO = ["audiencia_paises", "audiencia_ciudades", "audiencia_mujeres", "audiencia_edades", "audiencia_fuente", "usuario", "plataforma", "en_analisis_desde", "origen", "afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "tarifa_local", "tarifa_usd", "publicaciones_incluidas", "responsable", "notas", "comentarios_muestra"];
+const CAMPOS_TEXTO = ["audiencia_paises", "audiencia_ciudades", "audiencia_mujeres", "audiencia_edades", "audiencia_fuente", "usuario", "plataforma", "en_analisis_desde", "origen", "afinidad_equipo", "pais", "ciudad", "estado", "nicho", "etiquetas", "tiktok", "nombre_contacto", "email", "telefono", "tarifa", "tarifa_local", "tarifa_usd", "publicaciones_incluidas", "alcance_extra", "alcance_extra_detalle", "responsable", "notas", "comentarios_muestra"];
 const CAMPOS_MANUAL = ["seguidores", "seguidos", "likes_prom", "comentarios_prom", "vistas_prom", "posts_semana", "dias_ultimo_post"];
 function leerCampos() {
   const b = {};
